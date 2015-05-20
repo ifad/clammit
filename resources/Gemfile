@@ -1,0 +1,3 @@
+source 'https://rubygems.info'
+
+gem 'sinatra'

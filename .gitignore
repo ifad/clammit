@@ -1,0 +1,6 @@
+bin/*
+src/code.google.com/*
+src/github.com/*
+log
+log/*
+etc
