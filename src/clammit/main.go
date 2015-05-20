@@ -116,6 +116,7 @@ func main() {
 		http.Handle( "/test/", http.StripPrefix( "/test/",  fs ) )
 	}
 	http.HandleFunc( "/scan", scanHandler )
+	http.HandleFunc( "/scanforward", scanForwardHandler )
 	http.HandleFunc( "/info", infoHandler )
 	ctx.Logger.Println( "Listening on", ctx.Config.App.Listen )
 	ctx.Logger.Fatal( http.ListenAndServe( ctx.Config.App.Listen, nil ) )
@@ -126,7 +127,7 @@ func main() {
  */
 func checkURL( urlString string ) *url.URL {
 	parsedURL, err := url.Parse( urlString )
-    if err != nil {
+	if err != nil {
 		log.Fatal( "Invalid URL:", urlString )
 	}
 	return parsedURL
@@ -135,12 +136,23 @@ func checkURL( urlString string ) *url.URL {
 /*
  * Handler for /scan
  *
- * Constructs a forwarder and calls it
+ * Virus checks file and sends response
  */
 func scanHandler( w http.ResponseWriter, req *http.Request ) {
 	fw := forwarder.NewForwarder( ctx.ApplicationURL, ctx.ClamInterceptor )
 	fw.SetLogger( ctx.Logger )
-	fw.HandleRequest( w, req )
+	fw.HandleRequest( w, req, false )
+}
+
+/*
+ * Handler for /scanforward
+ *
+ * Constructs a forwarder and calls it
+ */
+func scanForwardHandler( w http.ResponseWriter, req *http.Request ) {
+	fw := forwarder.NewForwarder( ctx.ApplicationURL, ctx.ClamInterceptor )
+	fw.SetLogger( ctx.Logger )
+	fw.HandleRequest( w, req, true )
 }
 
 /*

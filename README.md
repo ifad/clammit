@@ -31,6 +31,7 @@ Option            | Description
 make clean        | Removes the compiled binary and intermediate libraries (in pkg/)
 make cleanimports | Removes the downloaded third-party source packages
 make gets         | Downloads the third-party source packages, if they are not already there
+make test         | Runs the application unit tests
 
 ## Running
 
@@ -80,7 +81,18 @@ This method will return JSON giving the current status of Clammit and its connec
   POST /scan
 ```
 
-This is the endpoint to submit files for scanning. The request must have content-type ```multipart/form-data```
+This is the endpoint to submit files for scanning only. The request must have content-type ```multipart/form-data```
+and any files to be scanned should be attached as file objects. Clammit will return an HTTP status code of 200 if
+the request is clean and 418 if there is a bad attachment.
+
+### Scan and Forward
+
+```
+  POST /scanforward
+```
+
+This is the primary endpoint you should hit. The request will be scanned, then forwarded to the application.
+The request must have content-type ```multipart/form-data```
 and any files to be scanned should be attached as file objects.
 
 ### Test

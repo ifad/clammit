@@ -70,7 +70,7 @@ func (f *Forwarder) SetLogger( logger *log.Logger ) {
 /*
  * Handles the given HTTP request.
  */
-func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request ) {
+func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request, forward bool ) {
 	f.logger.Println( "Received scan request" )
 
 	//
@@ -122,24 +122,28 @@ func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request ) {
 	//
 	// Forward the request to the configured server
 	//
+	if forward {
 
-	resp, err := f.forwardRequest( req, bodyFile.Name(), contentLength )
-//	if err != nil {
-//		f.logger.Printf( "Failed to forward request: %s", err.Error() )
-//		w.WriteHeader( 500 )
-//		w.Write( []byte("Clammit is unable to forward the request") )
-//		return
-//	}
-	defer resp.Body.Close()
+		resp, _ := f.forwardRequest( req, bodyFile.Name(), contentLength )
+	//	if err != nil {
+	//		f.logger.Printf( "Failed to forward request: %s", err.Error() )
+	//		w.WriteHeader( 500 )
+	//		w.Write( []byte("Clammit is unable to forward the request") )
+	//		return
+	//	}
+		defer resp.Body.Close()
 
-	//
-	// and return the response
-	//
-	for key, val := range resp.Header {
-		w.Header()[key] = val
+		//
+		// and return the response
+		//
+		for key, val := range resp.Header {
+			w.Header()[key] = val
+		}
+		w.WriteHeader( resp.StatusCode )
+		io.Copy( w, resp.Body ) // this could throw an error, but there's nowt we can do about it now
+	} else {
+		w.Write( []byte("Virus check passed") )
 	}
-	w.WriteHeader( resp.StatusCode )
-	io.Copy( w, resp.Body ) // this could throw an error, but there's nowt we can do about it now
 
 	return
 }
