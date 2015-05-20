@@ -112,7 +112,7 @@ func main() {
 	 * Set up the HTTP server
 	 */
 	if ctx.Config.App.TestPages {
-		fs := http.FileServer( http.Dir( "test" ) )
+		fs := http.FileServer( http.Dir( "testfiles" ) )
 		http.Handle( "/test/", http.StripPrefix( "/test/",  fs ) )
 	}
 	http.HandleFunc( "/scan", scanHandler )

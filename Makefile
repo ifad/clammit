@@ -2,6 +2,9 @@ export GOPATH=$(PWD)
 
 all:	gets application
 
+test:
+	@go test clammit/...
+
 clean:
 	@rm bin/clammit
 	@rm -rf pkg/*
