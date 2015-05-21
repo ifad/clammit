@@ -90,6 +90,9 @@ func TestForwarding( t *testing.T ) {
 		if r.Header.Get( "myheader" ) != "headervalue" {
 			t.Fatalf( "Request header 'myheader' is not set" )
 		}
+		if r.Header.Get( "X-Forwarded-For" ) != "foobar" {
+			t.Fatalf( "Request header 'X-Forwarded-For' is not set" )
+		}
 		if r.Body == nil {
 			t.Fatal( "Forwarded request has no body")
 		}
@@ -110,6 +113,7 @@ func TestForwarding( t *testing.T ) {
 
 	req, _ := http.NewRequest( "POST","http://localhost:99999/bar?crazy=true", strings.NewReader(requestText) )
 	req.Header.Set( "myheader", "headervalue" )
+	req.RemoteAddr = "foobar:1234"
 	w := NewTestResponseWriter()
 
 	fw.HandleRequest( w, req, true )

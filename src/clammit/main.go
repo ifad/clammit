@@ -36,6 +36,7 @@ type ApplicationConfig struct {
 	ClamdURL string            `gcfg:"clamd-url"`
 	Logfile string             `gcfg:"log-file"`
 	TestPages bool             `gcfg:"test-pages"`
+	Prefix string              `gcfg:"proxy-prefix"`
 }
 
 //
@@ -111,13 +112,13 @@ func main() {
 	/*
 	 * Set up the HTTP server
 	 */
+	http.HandleFunc( "/clammit", infoHandler )
+	http.HandleFunc( "/clammit/avscan", scanHandler )
 	if ctx.Config.App.TestPages {
 		fs := http.FileServer( http.Dir( "testfiles" ) )
-		http.Handle( "/test/", http.StripPrefix( "/test/",  fs ) )
+		http.Handle( "/clammit/test/", http.StripPrefix( "/test/",  fs ) )
 	}
-	http.HandleFunc( "/scan", scanHandler )
-	http.HandleFunc( "/scanforward", scanForwardHandler )
-	http.HandleFunc( "/info", infoHandler )
+	http.HandleFunc( "/", scanForwardHandler )
 	ctx.Logger.Println( "Listening on", ctx.Config.App.Listen )
 	ctx.Logger.Fatal( http.ListenAndServe( ctx.Config.App.Listen, nil ) )
 }
@@ -215,6 +216,13 @@ func infoHandler( w http.ResponseWriter, req *http.Request ) {
  * returns True if the body contains a virus
  */
 func (c *ClamInterceptor) Handle( w http.ResponseWriter, req *http.Request, body io.Reader ) bool {
+	//
+	// Don't care unless it's a post
+	//
+	if req.Method != "POST" && req.Method != "PUT" {
+		return false
+	}
+
 	//
 	// Find any attachments
 	//

@@ -10,13 +10,12 @@
 package forwarder
 
 import (
-	"clammit/scratch"
 	"net/http"
 	"net/url"
 	"log"
 	"io"
-	"os"
 	"io/ioutil"
+	"strings"
 )
 
 /*
@@ -43,6 +42,7 @@ type Forwarder struct {
 	applicationURL *url.URL
 	interceptor Interceptor
 	logger *log.Logger
+	contentMemoryThreshold int64
 }
 
 /*
@@ -53,6 +53,7 @@ func NewForwarder( applicationURL *url.URL, interceptor Interceptor ) *Forwarder
 		applicationURL: applicationURL,
 		interceptor: interceptor,
 		logger: log.New(ioutil.Discard, "", 0),
+		contentMemoryThreshold: CONTENT_LENGTH,
 	 }
 }
 
@@ -76,41 +77,21 @@ func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request, for
 	//
 	// Save the request body
 	//
-	sa, err := scratch.NewScratchArea("","clammit")
+	bodyHolder, err := NewBodyHolder( req.Body, req.ContentLength, f.contentMemoryThreshold )
 	if err != nil {
-		f.logger.Println( "Unable to create scratch directory: %s", err.Error() )
+		f.logger.Println( "Unable to save body to local store: %s", err.Error() )
 		w.WriteHeader( 503 )
-		w.Write( []byte("Clammit is unable to create scratch directory") )
+		w.Write( []byte("Clammit is unable to save body to local store") )
 		return
 	}
-	defer sa.Cleanup()
-	bodyFile, err := sa.NewFile("body")
-	if err != nil {
-		f.logger.Println( "Failed to create scratch file: %s", err.Error() )
-		w.WriteHeader( 500 )
-		w.Write( []byte("Clammit is unable to begin saving the request") )
-		return
-	}
-	var contentLength int64
-	if req.Body != nil {
-		defer req.Body.Close()
-		count, err := io.Copy( bodyFile, req.Body )
-		if err != nil {
-			f.logger.Println( "Failed to save body to scratch file: %s", err.Error() )
-			w.WriteHeader( 500 )
-			w.Write( []byte("Clammit is unable to save the request") )
-			return
-		}
-		contentLength = count
-	}
-	bodyFile.Close()
+	defer bodyHolder.Close()
 
 	//
 	// Allow the interceptor its chance
 	//
 	if f.interceptor != nil {
 		f.logger.Println( "Passing to interceptor" )
-		r, _ := os.Open( bodyFile.Name() )
+		r, _ := bodyHolder.GetReadCloser()
 		defer r.Close()
 		if( f.interceptor.Handle( w, req, r ) ) {
 			f.logger.Println( "Interceptor has deemed that this request should not be forwarded" )
@@ -124,14 +105,24 @@ func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request, for
 	//
 	if forward {
 
-		resp, _ := f.forwardRequest( req, bodyFile.Name(), contentLength )
-	//	if err != nil {
-	//		f.logger.Printf( "Failed to forward request: %s", err.Error() )
-	//		w.WriteHeader( 500 )
-	//		w.Write( []byte("Clammit is unable to forward the request") )
-	//		return
-	//	}
-		defer resp.Body.Close()
+		body, _ := bodyHolder.GetReadCloser()
+		defer body.Close()
+		resp, _ := f.forwardRequest( req, body, bodyHolder.ContentLength() )
+		if err != nil {
+			f.logger.Printf( "Failed to forward request: %s", err.Error() )
+			w.WriteHeader( 500 )
+			w.Write( []byte("Clammit is unable to forward the request") )
+			return
+		}
+		if resp == nil {
+			f.logger.Printf( "Failed to forward request: no response at all" )
+			w.WriteHeader( 500 )
+			w.Write( []byte("Clammit is unable to forward the request") )
+			return
+		}
+		if resp.Body != nil {
+			defer resp.Body.Close()
+		}
 
 		//
 		// and return the response
@@ -140,7 +131,9 @@ func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request, for
 			w.Header()[key] = val
 		}
 		w.WriteHeader( resp.StatusCode )
-		io.Copy( w, resp.Body ) // this could throw an error, but there's nowt we can do about it now
+		if( resp.Body != nil ) {
+			io.Copy( w, resp.Body ) // this could throw an error, but there's nowt we can do about it now
+		}
 	} else {
 		w.Write( []byte("Virus check passed") )
 	}
@@ -152,11 +145,7 @@ func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request, for
  * Forwards the request to the application. This function tries to preserve as much
  * as possible of the request - headers and body.
  */
-func (f *Forwarder) forwardRequest( req *http.Request, bodyFile string, contentLength int64 ) (*http.Response,error) {
-	newBody, err := os.Open(bodyFile)
-	if err != nil {
-		return nil, err
-	}
+func (f *Forwarder) forwardRequest( req *http.Request, body io.Reader, contentLength int64 ) (*http.Response,error) {
 	url := &url.URL{
 		Scheme:   f.applicationURL.Scheme,
 		Opaque:   f.applicationURL.Opaque,
@@ -168,10 +157,12 @@ func (f *Forwarder) forwardRequest( req *http.Request, bodyFile string, contentL
 	}
 	client := &http.Client{}
 	f.logger.Printf( "Will forward to: %s", url.String() )
-	freq, err := http.NewRequest( req.Method, url.String(), newBody )
+	freq, _ := http.NewRequest( req.Method, url.String(), body )
 	freq.ContentLength = contentLength
 	for key, val := range req.Header {
 		freq.Header[key] = val
 	}
+	// Be nice and add client IP to forwarding chain
+	freq.Header.Add( "X-Forwarded-For", strings.Split(req.RemoteAddr, ":")[0] )
 	return client.Do(freq)
 }

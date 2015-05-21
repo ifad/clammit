@@ -1,0 +1,44 @@
+#!/bin/bash
+
+usage() {
+	echo "Usage: $(basename $0) {-i|-s|-f} [options]"
+	echo
+	echo "Options:  -i   get clammit info"
+	echo "          -s   scan file (allows -F|-v|-n)"
+	echo "          -f   forward file (allows -F|-v|-n, -p)"
+	echo
+	echo "          -F FILE  file to send"
+	echo "          -v       send virus.dat"
+	echo "          -c       send clean.dat"
+	echo "          -p       query path (e.g. document/clammit/12345)"
+	echo "          -a       HOST:PORT of the clammit endpoint"
+	exit 1
+}
+
+ADDRESS=localhost:8438
+ACTION=INFO
+QUERY_PATH=foo
+FILENAME=virus.dat
+
+while getopts "isfF:vca:p:h?" option
+do
+	case $option in
+		i) ACTION=INFO;;
+		s) ACTION=SCAN;;
+		f) ACTION=FORWARD;;
+		F) FILENAME=$OPTARG;;
+		v) FILENAME=virus.dat;;
+		c) FILENAME=clean.dat;;
+		p) QUERY_PATH=$OPTARG;;
+		a) ADDRESS=$OPTARG;;
+		h|\?) usage;;
+		*) usage;;
+	esac
+done
+
+case $ACTION in
+	INFO) curl "http://$ADDRESS/clammit";;
+	SCAN) curl -F qqfile=@$FILENAME "http://$ADDRESS/clammit/avscan";;
+	FORWARD) curl -F qqfile=@$FILENAME "http://$ADDRESS/$QUERY_PATH";;
+esac
+echo

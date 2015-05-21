@@ -65,12 +65,14 @@ test-pages      | (Optional) If true, clammit will also offer up a page to perfo
 
 ## Calling Clammit
 
-Clammit exposes 3 methods:
+Clammit's own actions are grouped under the "/clammit" path (see below). Any
+other request will be scanned (POST and PUT only) then forwarded to the
+application.
 
 ### Info
 
 ```
-  GET /info
+  GET /clammit/info
 ```
 
 This method will return JSON giving the current status of Clammit and its connection to ClamAV.
@@ -78,27 +80,17 @@ This method will return JSON giving the current status of Clammit and its connec
 ### Scan
 
 ```
-  POST /scan
+  POST /clammit/scan
 ```
 
 This is the endpoint to submit files for scanning only. The request must have content-type ```multipart/form-data```
 and any files to be scanned should be attached as file objects. Clammit will return an HTTP status code of 200 if
 the request is clean and 418 if there is a bad attachment.
 
-### Scan and Forward
-
-```
-  POST /scanforward
-```
-
-This is the primary endpoint you should hit. The request will be scanned, then forwarded to the application.
-The request must have content-type ```multipart/form-data```
-and any files to be scanned should be attached as file objects.
-
 ### Test
 
 ```
-  GET /test/
+  GET /clammit/test/
 ```
 
 This will return a simple file upload page, to test sending requests to Clammit. These pages are located in the

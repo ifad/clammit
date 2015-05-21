@@ -14,13 +14,13 @@
       </div>
       <h2>Clammit info</h2>
       <div class="row">
-        <form id="infoform" method="GET" action="/info" class="form-horizontal" enctype="multipart/form-data">
+        <form id="infoform" method="GET" action="/clammit" class="form-horizontal" enctype="multipart/form-data">
           <input type="submit" class="btn btn-primary"/>
         </form>
       </div>
       <h2>Scan document</h2>
       <div class="row">
-        <form id="scanform" method="POST" action="/scan" class="form-horizontal" enctype="multipart/form-data">
+        <form id="scanform" method="POST" action="/clammit/scan" class="form-horizontal" enctype="multipart/form-data">
           <input type="file" name="qqfile" class="form-control"/>
           <input type="hidden" name="foobar" value="this is a test field"/>
           <input type="submit" class="btn btn-primary"/>
@@ -28,7 +28,7 @@
       </div>
       <h2>Scan document and forward to the application</h2>
       <div class="row">
-        <form id="forwardform" method="POST" action="/scanforward" class="form-horizontal" enctype="multipart/form-data">
+        <form id="forwardform" method="POST" action="/document/clammit/a/fred.pdf" class="form-horizontal" enctype="multipart/form-data">
           <input type="file" name="qqfile" class="form-control"/>
           <input type="hidden" name="foobar" value="this is a test field"/>
           <input type="submit" class="btn btn-primary"/>
