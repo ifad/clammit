@@ -50,11 +50,32 @@ The configuration is pretty simple:
 
 Setting         | Description
 :---------------| :-----------------------------------------------------------------------------
-listen          | The port to listen on - don't forget the leading ':'
+listen          | The listen address (see below)
 application-url | The URL to forward the request to (including path!)
 clamd-url       | The URL of the clamd server
 log-file        | (Optional) The clammit log file
 test-pages      | (Optional) If true, clammit will also offer up a page to perform test uploads
+
+### Listen address
+
+This configuration setting allows you to specify TCP address:port or Unix socket filename.
+You can specify one of these forms:
+
+* tcp:host:port        (listens on one TCP interface, IPv4 and IPv6)
+* tcp:port             (listens on all interfaces)
+* tcp4:host:port       (listens on one TCP4 interface)
+* tcp4:port            (listens on all TCP4 interfaces)
+* tcp6:[host]:port     (listens on one TCP6 interface)
+* tcp6:port            (listens on all TCP6 interfaces)
+* unix:filename        (listen on Unix socket)
+* host:port            (assumes TCP)
+* :port                (assumes TCP)
+
+If you wish to only listen on IPv6 addresses with the tcp: scheme, the
+host should be encapsulated within brackets, e.g. tcp:[::1]:1234
+
+Using scheme unix:, Clammit will abort with an error "bind: address already in
+ use" if the socket file exists. It will delete it on shutdown.
 
 ## Installation
 

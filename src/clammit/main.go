@@ -10,6 +10,8 @@ import (
 	clamd "github.com/dutchcoders/go-clamd"
 	"code.google.com/p/gcfg"
 	"clammit/forwarder"
+	"net"
+	"strings"
 	"net/http"
 	"net/url"
 	"encoding/json"
@@ -22,6 +24,8 @@ import (
 	"io/ioutil"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 //
@@ -33,6 +37,7 @@ type Config struct {
 
 type ApplicationConfig struct {
 	Listen string              `gcfg:"listen"`
+	SocketPerms int            `gcfg:"unix-socket-perms"`
 	ApplicationURL string      `gcfg:"application-url"`
 	ClamdURL string            `gcfg:"clamd-url"`
 	Logfile string             `gcfg:"log-file"`
@@ -57,6 +62,9 @@ type Ctx struct {
 	ClamInterceptor *ClamInterceptor
 	Logger *log.Logger
 	Debug bool
+	Listener net.Listener
+	ActivityChan chan int
+	ShuttingDown bool
 }
 
 //
@@ -85,7 +93,10 @@ func main() {
 	 * Construct configuration, set up logging
 	 */
 	flag.Parse()
-	ctx = &Ctx{}
+	ctx = &Ctx{
+		ActivityChan: make(chan int),
+		ShuttingDown: false,
+    }
 
 	if configFile == "" {
 		log.Fatal( "No configuration file specified" )
@@ -93,16 +104,11 @@ func main() {
 	if err := gcfg.ReadFileInto( &ctx.Config, configFile ); err != nil {
 		log.Fatal( "Configuration read failure:", err )
 	}
-
-	ctx.Logger = log.New( os.Stdout, "", log.LstdFlags )
-	if ctx.Config.App.Logfile != "" {
-		w, err := os.OpenFile( ctx.Config.App.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660 )
-		if err == nil {
-			ctx.Logger = log.New( w, "", log.LstdFlags )
-		} else {
-			log.Fatal( "Failed to open log file", ctx.Config.App.Logfile, ":", err )
-		}
+	if ctx.Config.App.SocketPerms == 0 {
+		ctx.Config.App.SocketPerms = 0777;
 	}
+
+	startLogging()
 
 	/*
 	 * Construct objects, validate the URLs
@@ -115,16 +121,71 @@ func main() {
 	/*
 	 * Set up the HTTP server
 	 */
-	http.HandleFunc( "/clammit", infoHandler )
-	http.HandleFunc( "/clammit/scan", scanHandler )
+	router := http.NewServeMux()
+
+	router.HandleFunc( "/clammit", infoHandler )
+	router.HandleFunc( "/clammit/scan", scanHandler )
 	if ctx.Config.App.TestPages {
 		fs := http.FileServer( http.Dir( "testfiles" ) )
-		http.Handle( "/clammit/test/", http.StripPrefix( "/test/",  fs ) )
+		router.Handle( "/clammit/test/", http.StripPrefix( "/test/",  fs ) )
 	}
-	http.HandleFunc( "/", scanForwardHandler )
-	ctx.Logger.Println( "Listening on", ctx.Config.App.Listen )
+	router.HandleFunc( "/", scanForwardHandler )
+
 	log.SetOutput( ioutil.Discard ) // go-clamd has irritating logging, so turn it off
-	ctx.Logger.Fatal( http.ListenAndServe( ctx.Config.App.Listen, nil ) )
+
+	if listener, err := getListener( ctx.Config.App.Listen, ctx.Config.App.SocketPerms ); err != nil {
+		ctx.Logger.Fatal( "Unable to listen on: ", ctx.Config.App.Listen, ", reason: ", err )
+	} else {
+		ctx.Listener = listener
+		beGraceful() // graceful shutdown from here on in
+		ctx.Logger.Println( "Listening on", ctx.Config.App.Listen )
+		http.Serve( listener, router )
+	}
+}
+
+/*
+ * Starts logging
+ */
+func startLogging() {
+	ctx.Logger = log.New( os.Stdout, "", log.LstdFlags )
+	if ctx.Config.App.Logfile != "" {
+		w, err := os.OpenFile( ctx.Config.App.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660 )
+		if err == nil {
+			ctx.Logger = log.New( w, "", log.LstdFlags )
+		} else {
+			log.Fatal( "Failed to open log file", ctx.Config.App.Logfile, ":", err )
+		}
+	}
+}
+
+/*
+ * Handles graceful shutdown. Sets ctx.ShuttingDown = true to stop any new
+ * requests, then waits for active requests to complete before closing the
+ * HTTP listener.
+ */
+func beGraceful() {
+	sigchan := make(chan os.Signal)
+	signal.Notify( sigchan, syscall.SIGINT, syscall.SIGTERM )
+	go func() {
+		activity := 0
+		for {
+			select {
+				case _ = <-sigchan:
+					ctx.Logger.Println( "Received termination signal" )
+					ctx.ShuttingDown = true
+					for activity > 0 {
+						ctx.Logger.Printf( "There are %d active requests, waiting", activity )
+						i := <-ctx.ActivityChan
+						activity += i
+					}
+					// This will cause main() to continue from http.Serve()
+					// it will also clean up the unix socket (if relevant)
+					ctx.Listener.Close()
+				case i := <-ctx.ActivityChan:
+					activity += i
+			}
+		}
+	}()
 }
 
 /*
@@ -139,11 +200,59 @@ func checkURL( urlString string ) *url.URL {
 }
 
 /*
+ * Returns a TCP or Unix socket listener, according to the scheme prefix:
+ *
+ *   unix:/tmp/foo.sock
+ *   tcp::8438
+ *   :8438                 - tcp listener
+ */
+func getListener( address string, socketPerms int ) (listener net.Listener, err error) {
+	if address == "" {
+		return nil, fmt.Errorf( "No listen address specified" )
+	}
+	if idx := strings.Index( address, ":" ); idx >= 0 {
+		scheme := address[0:idx]
+		switch scheme {
+			case "tcp", "tcp4" :
+				path := address[idx+1:]
+				if strings.Index(path,":") == -1 {
+					path = ":" + path
+				}
+				listener, err = net.Listen( scheme, path )
+			case "tcp6" : // general form: [host]:port
+				path := address[idx+1:]
+				if strings.Index(path,"[") != 0 { // port only
+					if strings.Index(path,":") != 0 { // no leading :
+						path = ":" + path
+					}
+				}
+				listener, err = net.Listen( scheme, path )
+			case "unix", "unixpacket" :
+				path := address[idx+1:]
+				if listener, err = net.Listen( scheme, path ); err == nil {
+					os.Chmod( path, os.FileMode(socketPerms) )
+				}
+			default : // assume TCP4 address
+				listener, err = net.Listen( "tcp", address )
+		}
+	} else { // no scheme, port only specified
+		listener, err = net.Listen( "tcp", ":" + address )
+	}
+	return listener, err
+}
+
+/*
  * Handler for /scan
  *
  * Virus checks file and sends response
  */
 func scanHandler( w http.ResponseWriter, req *http.Request ) {
+	if ctx.ShuttingDown {
+		return
+	}
+	ctx.ActivityChan <- 1
+	defer func() { ctx.ActivityChan <- -1 }()
+
 	if ! ctx.ClamInterceptor.Handle( w, req, req.Body ) {
 		w.Write( []byte("No virus found") )
 	}
@@ -155,6 +264,12 @@ func scanHandler( w http.ResponseWriter, req *http.Request ) {
  * Constructs a forwarder and calls it
  */
 func scanForwardHandler( w http.ResponseWriter, req *http.Request ) {
+	if ctx.ShuttingDown {
+		return
+	}
+	ctx.ActivityChan <- 1
+	defer func() { ctx.ActivityChan <- -1 }()
+
 	fw := forwarder.NewForwarder( ctx.ApplicationURL, ctx.ClamInterceptor )
 	fw.SetLogger( ctx.Logger )
 	fw.HandleRequest( w, req )
@@ -167,6 +282,12 @@ func scanForwardHandler( w http.ResponseWriter, req *http.Request ) {
  * Emits the information as a JSON response
  */
 func infoHandler( w http.ResponseWriter, req *http.Request ) {
+	if ctx.ShuttingDown {
+		return
+	}
+	ctx.ActivityChan <- 1
+	defer func() { ctx.ActivityChan <- -1 }()
+
 	c := clamd.NewClamd( ctx.ClamInterceptor.ClamdURL )
 	info := &Info{
 		ClamdURL: ctx.ClamInterceptor.ClamdURL,

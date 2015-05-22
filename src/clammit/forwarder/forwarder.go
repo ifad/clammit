@@ -10,7 +10,9 @@
 package forwarder
 
 import (
+	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"log"
 	"io"
@@ -141,6 +143,30 @@ func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request ) {
  * as possible of the request - headers and body.
  */
 func (f *Forwarder) forwardRequest( req *http.Request, body io.Reader, contentLength int64 ) (*http.Response,error) {
+	client, url := f.getClient( req )
+	freq, _ := http.NewRequest( req.Method, url.String(), body )
+	freq.ContentLength = contentLength
+	for key, val := range req.Header {
+		freq.Header[key] = val
+	}
+
+	// Be nice and add client IP to forwarding chain
+	if req.RemoteAddr != "@" {
+		xff := freq.Header.Get( "X-Forwarded-For" )
+		if xff != "" {
+			xff += ", "
+		}
+		xff += req.Header.Get( "X-Forwarded-For" ) + strings.Split(req.RemoteAddr, ":")[0]
+		freq.Header.Set( "X-Forwarded-For", xff )
+	}
+
+	return client.Do(freq)
+}
+
+/*
+ * Gets an appropriate net/http.Client. I'm not sure if this is necessary, but it forces the issue.
+ */
+func (f *Forwarder) getClient( req *http.Request) (*http.Client, *url.URL) {
 	url := &url.URL{
 		Scheme:   f.applicationURL.Scheme,
 		Opaque:   f.applicationURL.Opaque,
@@ -150,14 +176,21 @@ func (f *Forwarder) forwardRequest( req *http.Request, body io.Reader, contentLe
 		RawQuery: req.URL.RawQuery,
 		Fragment: req.URL.Fragment,
 	}
-	client := &http.Client{}
-	f.logger.Printf( "Will forward to: %s", url.String() )
-	freq, _ := http.NewRequest( req.Method, url.String(), body )
-	freq.ContentLength = contentLength
-	for key, val := range req.Header {
-		freq.Header[key] = val
+	if f.applicationURL.Scheme == "unix" {
+		f.logger.Printf( "Will forward to: %s on unix socket %s", req.URL.Path, f.applicationURL.Path )
+		url.Scheme = "http"
+		url.Host = "x"
+		jar, _ := cookiejar.New(nil)
+		return &http.Client{
+			Jar: jar,
+			Transport: &http.Transport{
+				Dial: func(network, addr string)(net.Conn, error) {
+					return net.Dial("unix", f.applicationURL.Path)
+				},
+			},
+		}, url
+	} else {
+		f.logger.Printf( "Will forward to: %s at %s", req.URL.Path, f.applicationURL.String() )
+		return &http.Client{}, url
 	}
-	// Be nice and add client IP to forwarding chain
-	freq.Header.Add( "X-Forwarded-For", strings.Split(req.RemoteAddr, ":")[0] )
-	return client.Do(freq)
 }
