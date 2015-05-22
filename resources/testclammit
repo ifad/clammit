@@ -38,7 +38,7 @@ done
 
 case $ACTION in
 	INFO) curl "http://$ADDRESS/clammit";;
-	SCAN) curl -F qqfile=@$FILENAME "http://$ADDRESS/clammit/avscan";;
+	SCAN) curl -F qqfile=@$FILENAME "http://$ADDRESS/clammit/scan";;
 	FORWARD) curl -F qqfile=@$FILENAME "http://$ADDRESS/$QUERY_PATH";;
 esac
 echo

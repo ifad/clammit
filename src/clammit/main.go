@@ -19,6 +19,7 @@ import (
 	"flag"
 	"bytes"
 	"io"
+	"io/ioutil"
 	"fmt"
 	"os"
 )
@@ -37,6 +38,7 @@ type ApplicationConfig struct {
 	Logfile string             `gcfg:"log-file"`
 	TestPages bool             `gcfg:"test-pages"`
 	Prefix string              `gcfg:"proxy-prefix"`
+	Debug bool                 `gcfg:"debug"`
 }
 
 //
@@ -54,6 +56,7 @@ type Ctx struct {
 	ApplicationURL *url.URL
 	ClamInterceptor *ClamInterceptor
 	Logger *log.Logger
+	Debug bool
 }
 
 //
@@ -113,13 +116,14 @@ func main() {
 	 * Set up the HTTP server
 	 */
 	http.HandleFunc( "/clammit", infoHandler )
-	http.HandleFunc( "/clammit/avscan", scanHandler )
+	http.HandleFunc( "/clammit/scan", scanHandler )
 	if ctx.Config.App.TestPages {
 		fs := http.FileServer( http.Dir( "testfiles" ) )
 		http.Handle( "/clammit/test/", http.StripPrefix( "/test/",  fs ) )
 	}
 	http.HandleFunc( "/", scanForwardHandler )
 	ctx.Logger.Println( "Listening on", ctx.Config.App.Listen )
+	log.SetOutput( ioutil.Discard ) // go-clamd has irritating logging, so turn it off
 	ctx.Logger.Fatal( http.ListenAndServe( ctx.Config.App.Listen, nil ) )
 }
 
@@ -141,7 +145,9 @@ func checkURL( urlString string ) *url.URL {
  */
 func scanHandler( w http.ResponseWriter, req *http.Request ) {
 	fw := forwarder.NewForwarder( ctx.ApplicationURL, ctx.ClamInterceptor )
-	fw.SetLogger( ctx.Logger )
+	if ctx.Debug {
+		fw.SetLogger( ctx.Logger )
+	}
 	fw.HandleRequest( w, req, false )
 }
 
