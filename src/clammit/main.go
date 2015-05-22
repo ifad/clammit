@@ -144,22 +144,20 @@ func checkURL( urlString string ) *url.URL {
  * Virus checks file and sends response
  */
 func scanHandler( w http.ResponseWriter, req *http.Request ) {
-	fw := forwarder.NewForwarder( ctx.ApplicationURL, ctx.ClamInterceptor )
-	if ctx.Debug {
-		fw.SetLogger( ctx.Logger )
+	if ! ctx.ClamInterceptor.Handle( w, req, req.Body ) {
+		w.Write( []byte("No virus found") )
 	}
-	fw.HandleRequest( w, req, false )
 }
 
 /*
- * Handler for /scanforward
+ * Handler for scan & forward
  *
  * Constructs a forwarder and calls it
  */
 func scanForwardHandler( w http.ResponseWriter, req *http.Request ) {
 	fw := forwarder.NewForwarder( ctx.ApplicationURL, ctx.ClamInterceptor )
 	fw.SetLogger( ctx.Logger )
-	fw.HandleRequest( w, req, true )
+	fw.HandleRequest( w, req )
 }
 
 /*

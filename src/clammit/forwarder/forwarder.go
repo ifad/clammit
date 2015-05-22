@@ -71,7 +71,7 @@ func (f *Forwarder) SetLogger( logger *log.Logger ) {
 /*
  * Handles the given HTTP request.
  */
-func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request, forward bool ) {
+func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request ) {
 	f.logger.Println( "Received scan request" )
 
 	//
@@ -103,39 +103,34 @@ func (f *Forwarder) HandleRequest( w http.ResponseWriter, req *http.Request, for
 	//
 	// Forward the request to the configured server
 	//
-	if forward {
+	body, _ := bodyHolder.GetReadCloser()
+	defer body.Close()
+	resp, _ := f.forwardRequest( req, body, bodyHolder.ContentLength() )
+	if err != nil {
+		f.logger.Printf( "Failed to forward request: %s", err.Error() )
+		w.WriteHeader( 500 )
+		w.Write( []byte("Clammit is unable to forward the request") )
+		return
+	}
+	if resp == nil {
+		f.logger.Printf( "Failed to forward request: no response at all" )
+		w.WriteHeader( 500 )
+		w.Write( []byte("Clammit is unable to forward the request") )
+		return
+	}
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
 
-		body, _ := bodyHolder.GetReadCloser()
-		defer body.Close()
-		resp, _ := f.forwardRequest( req, body, bodyHolder.ContentLength() )
-		if err != nil {
-			f.logger.Printf( "Failed to forward request: %s", err.Error() )
-			w.WriteHeader( 500 )
-			w.Write( []byte("Clammit is unable to forward the request") )
-			return
-		}
-		if resp == nil {
-			f.logger.Printf( "Failed to forward request: no response at all" )
-			w.WriteHeader( 500 )
-			w.Write( []byte("Clammit is unable to forward the request") )
-			return
-		}
-		if resp.Body != nil {
-			defer resp.Body.Close()
-		}
-
-		//
-		// and return the response
-		//
-		for key, val := range resp.Header {
-			w.Header()[key] = val
-		}
-		w.WriteHeader( resp.StatusCode )
-		if( resp.Body != nil ) {
-			io.Copy( w, resp.Body ) // this could throw an error, but there's nowt we can do about it now
-		}
-	} else {
-		w.Write( []byte("Virus check passed") )
+	//
+	// and return the response
+	//
+	for key, val := range resp.Header {
+		w.Header()[key] = val
+	}
+	w.WriteHeader( resp.StatusCode )
+	if( resp.Body != nil ) {
+		io.Copy( w, resp.Body ) // this could throw an error, but there's nowt we can do about it now
 	}
 
 	return

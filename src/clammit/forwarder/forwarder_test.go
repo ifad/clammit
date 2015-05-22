@@ -60,10 +60,10 @@ func TestInterceptor( t *testing.T ) {
 		return true
 	}) )
 
-	req, _ := http.NewRequest( "POST","http://localhost:9999/bar?crazy=true", strings.NewReader(bodyText) )
+	req, _ := http.NewRequest( "POST", "http://localhost:9999/bar?crazy=true", strings.NewReader(bodyText) )
 	w := NewTestResponseWriter()
 
-	fw.HandleRequest( w, req, true )
+	fw.HandleRequest( w, req )
 
 	if w.StatusCode != 204 {
 		t.Fatalf( "Response: StatusCode was %d, expected %d", w.StatusCode, 204 )
@@ -111,12 +111,12 @@ func TestForwarding( t *testing.T ) {
 
 	fw := NewForwarder( tsURL, nil )
 
-	req, _ := http.NewRequest( "POST","http://localhost:99999/bar?crazy=true", strings.NewReader(requestText) )
+	req, _ := http.NewRequest( "POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText) )
 	req.Header.Set( "myheader", "headervalue" )
 	req.RemoteAddr = "foobar:1234"
 	w := NewTestResponseWriter()
 
-	fw.HandleRequest( w, req, true )
+	fw.HandleRequest( w, req )
 
 	if w.StatusCode != 202 {
 		t.Fatalf( "Response: StatusCode was %d, expected %d", w.StatusCode, 202 )
