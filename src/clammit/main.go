@@ -12,6 +12,7 @@ import (
 	"clammit/forwarder"
 	"net"
 	"strings"
+	"strconv"
 	"net/http"
 	"net/url"
 	"encoding/json"
@@ -37,7 +38,7 @@ type Config struct {
 
 type ApplicationConfig struct {
 	Listen string              `gcfg:"listen"`
-	SocketPerms int            `gcfg:"unix-socket-perms"`
+	SocketPerms string         `gcfg:"unix-socket-perms"`
 	ApplicationURL string      `gcfg:"application-url"`
 	ClamdURL string            `gcfg:"clamd-url"`
 	Logfile string             `gcfg:"log-file"`
@@ -103,8 +104,12 @@ func main() {
 	if err := gcfg.ReadFileInto( &ctx.Config, configFile ); err != nil {
 		log.Fatal( "Configuration read failure:", err )
 	}
-	if ctx.Config.App.SocketPerms == 0 {
-		ctx.Config.App.SocketPerms = 0777;
+	// Socket perms are octal!
+	socketPerms := 0777
+	if ctx.Config.App.SocketPerms != "" {
+		if sp, err := strconv.ParseInt( ctx.Config.App.SocketPerms, 8, 0 ) ; err == nil {
+			socketPerms = int(sp)
+		}
 	}
 
 	startLogging()
@@ -132,7 +137,7 @@ func main() {
 
 	log.SetOutput( ioutil.Discard ) // go-clamd has irritating logging, so turn it off
 
-	if listener, err := getListener( ctx.Config.App.Listen, ctx.Config.App.SocketPerms ); err != nil {
+	if listener, err := getListener( ctx.Config.App.Listen, socketPerms ); err != nil {
 		ctx.Logger.Fatal( "Unable to listen on: ", ctx.Config.App.Listen, ", reason: ", err )
 	} else {
 		ctx.Listener = listener

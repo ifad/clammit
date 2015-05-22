@@ -1,0 +1,11 @@
+#!/bin/bash
+
+BASE=$(dirname "$0")
+
+CFG="${BASE}/../etc/clammit.cfg"
+[ -f "$CFG" ] || { echo "Missing config: $CFG"; exit 1; }
+
+mkdir -p "${BASE}/log"
+LOGFILE="${BASE}/log/clammit.log"
+
+$(dirname $0)/clammit -config=$CFG >>"${LOGFILE}" 2>&1 & disown -h
