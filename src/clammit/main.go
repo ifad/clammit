@@ -42,7 +42,6 @@ type ApplicationConfig struct {
 	ClamdURL string            `gcfg:"clamd-url"`
 	Logfile string             `gcfg:"log-file"`
 	TestPages bool             `gcfg:"test-pages"`
-	Prefix string              `gcfg:"proxy-prefix"`
 	Debug bool                 `gcfg:"debug"`
 }
 
