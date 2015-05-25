@@ -134,9 +134,13 @@ func main() {
 		ShuttingDown: false,
     }
 
+	ctx.Config.App = DefaultApplicationConfig
+
+fmt.Println( "JOE: Config before:", ctx.Config.App )
 	if err := gcfg.ReadFileInto( &ctx.Config, configFile ); err != nil {
 		log.Fatalf( "Configuration read failure: %s", err.Error() )
 	}
+fmt.Println( "JOE: Config after: ", ctx.Config.App )
 
 	// Socket perms are octal!
 	socketPerms := 0777
