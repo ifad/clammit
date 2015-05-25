@@ -50,12 +50,12 @@ type Forwarder struct {
 /*
  * Constructs a new forwarder. Pass in the application URL and the interceptor.
  */
-func NewForwarder( applicationURL *url.URL, interceptor Interceptor ) *Forwarder {
+func NewForwarder( applicationURL *url.URL, contentMemoryThreshold int64, interceptor Interceptor ) *Forwarder {
 	return &Forwarder{
 		applicationURL: applicationURL,
 		interceptor: interceptor,
 		logger: log.New(ioutil.Discard, "", 0),
-		contentMemoryThreshold: CONTENT_LENGTH,
+		contentMemoryThreshold: contentMemoryThreshold,
 	 }
 }
 

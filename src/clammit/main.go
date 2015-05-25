@@ -16,12 +16,9 @@ import (
 	"net/http"
 	"net/url"
 	"encoding/json"
-	"mime"
-	"mime/multipart"
 	"log"
 	"flag"
 	"bytes"
-	"io"
 	"io/ioutil"
 	"fmt"
 	"os"
@@ -37,20 +34,59 @@ type Config struct {
 }
 
 type ApplicationConfig struct {
-	Listen string              `gcfg:"listen"`
-	SocketPerms string         `gcfg:"unix-socket-perms"`
-	ApplicationURL string      `gcfg:"application-url"`
-	ClamdURL string            `gcfg:"clamd-url"`
-	Logfile string             `gcfg:"log-file"`
-	TestPages bool             `gcfg:"test-pages"`
-	Debug bool                 `gcfg:"debug"`
+	// The address to listen on. This can be one of:
+	// * tcp:host:port
+	// * tcp:port
+	// * unix:filename
+	// * host:port
+	// * :port
+	//
+	// For example:
+	//   Listen: tcp:0.0.0.0:8438
+	//   Listen: unix:/tmp/clammit.sock
+	//   Listen: :8438
+	Listen string                `gcfg:"listen"`
+	// Socket file permissions (only used if listening on a unix socket), in octal form.
+	//
+	// For example:
+	//   SocketPerms: 0766
+	SocketPerms string           `gcfg:"unix-socket-perms"`
+	// The URL of the application that Clammit is proxying. Generally, this will
+	// be the base URL (http://host:port/), but you can also add a path prefix
+	// if needed (http://host:port/prefix)
+	ApplicationURL string        `gcfg:"application-url"`
+	// The URL of clamd, which will either be TCP or Unix:
+	//
+	// For example:
+	//   ClamdURL: tcp://localhost:3310
+	//   ClamdURL: unix:/tmp/clamd.sock
+	ClamdURL string              `gcfg:"clamd-url"`
+	// The HTTP status code to return when a virus is found
+	VirusStatusCode int          `gcfg:"virus-status-code"`
+	// If the body content-length exceeds this value, it will be written to
+	// disk. Below it, we'll hold the whole body in memory to improve speed.
+	ContentMemoryThreshold int64 `gcfg:"content-memory-threshold"`
+	// Log file name (default is to log to stdout)
+	Logfile string               `gcfg:"log-file"`
+	// If true, clammit will expose a small test HTML page.
+	TestPages bool               `gcfg:"test-pages"`
+	// If true, will log the progression of each request through the forwarder
+	Debug bool                   `gcfg:"debug"`
 }
 
 //
-// The implementation of the ClamAV interceptor
+// Default configuration
 //
-type ClamInterceptor struct {
-	ClamdURL string
+var DefaultApplicationConfig = ApplicationConfig{
+	Listen:                 ":8438",
+	SocketPerms:            "0777",
+	ApplicationURL:         "",
+	ClamdURL:               "",
+	VirusStatusCode:        418,
+	ContentMemoryThreshold: 1024*1024,
+	Logfile:                "",
+	TestPages:              true,
+	Debug:                  false,
 }
 
 //
@@ -98,17 +134,17 @@ func main() {
 		ShuttingDown: false,
     }
 
-	if configFile == "" {
-		log.Fatal( "No configuration file specified" )
-	}
 	if err := gcfg.ReadFileInto( &ctx.Config, configFile ); err != nil {
-		log.Fatal( "Configuration read failure:", err )
+		log.Fatalf( "Configuration read failure: %s", err.Error() )
 	}
+
 	// Socket perms are octal!
 	socketPerms := 0777
 	if ctx.Config.App.SocketPerms != "" {
 		if sp, err := strconv.ParseInt( ctx.Config.App.SocketPerms, 8, 0 ) ; err == nil {
 			socketPerms = int(sp)
+		} else {
+			log.Fatalf( "SocketPerms invalid (expected 4-digit octal: %s", err.Error )
 		}
 	}
 
@@ -119,8 +155,10 @@ func main() {
 	 */
 	ctx.ApplicationURL = checkURL( ctx.Config.App.ApplicationURL )
 	checkURL( ctx.Config.App.ClamdURL )
-
-	ctx.ClamInterceptor =  &ClamInterceptor{ ClamdURL: ctx.Config.App.ClamdURL }
+	ctx.ClamInterceptor =  &ClamInterceptor{
+		ClamdURL:        ctx.Config.App.ClamdURL,
+		VirusStatusCode: ctx.Config.App.VirusStatusCode,
+	 }
 
 	/*
 	 * Set up the HTTP server
@@ -274,7 +312,7 @@ func scanForwardHandler( w http.ResponseWriter, req *http.Request ) {
 	ctx.ActivityChan <- 1
 	defer func() { ctx.ActivityChan <- -1 }()
 
-	fw := forwarder.NewForwarder( ctx.ApplicationURL, ctx.ClamInterceptor )
+	fw := forwarder.NewForwarder( ctx.ApplicationURL, ctx.Config.App.ContentMemoryThreshold, ctx.ClamInterceptor )
 	fw.SetLogger( ctx.Logger )
 	fw.HandleRequest( w, req )
 }
@@ -337,90 +375,3 @@ func infoHandler( w http.ResponseWriter, req *http.Request ) {
 	w.Write( []byte(s) )
 }
 
-/*
- * Interceptor implementation for Clamd
- *
- * Runs a multi-part parser across the request body and sends all file contents to Clamd
- *
- * returns True if the body contains a virus
- */
-func (c *ClamInterceptor) Handle( w http.ResponseWriter, req *http.Request, body io.Reader ) bool {
-	//
-	// Don't care unless it's a post
-	//
-	if req.Method != "POST" && req.Method != "PUT" {
-		return false
-	}
-
-	//
-	// Find any attachments
-	//
-	_, params, err := mime.ParseMediaType( req.Header.Get( "Content-Type" ) )
-	if err != nil {
-		return false
-	}
-	boundary := params["boundary"]
-	if boundary == "" {
-		return false
-	}
-
-	reader := multipart.NewReader( body, boundary )
-
-	//
-	// Scan them
-	//
-	var broken_err error
-
-	for {
-		if part, err := reader.NextPart(); err != nil {
-			break // all done
-		} else {
-			if part.FileName() != "" {
-				defer part.Close()
-				ctx.Logger.Println( "Scanning",part.FileName() )
-				if hasVirus, err := c.Scan( part ); err != nil {
-					broken_err = err
-				} else if hasVirus {
-					w.WriteHeader( 418 )
-					w.Write( []byte(fmt.Sprintf( "File %s has a virus!", part.FileName() ) ) )
-					return true
-				}
-			}
-		}
-	}
-
-	//
-	// If failure, we bomb out here
-	//
-	if broken_err != nil {
-		w.WriteHeader( 500 )
-		w.Write( []byte(fmt.Sprintf( "Unable to scan a file: %s", broken_err.Error()) ) )
-		return true
-	}
-
-	return false
-}
-
-/*
- * This function performs the actual virus scan
- */
-func (c *ClamInterceptor) Scan( reader io.Reader ) (bool, error) {
-
-	clam := clamd.NewClamd( c.ClamdURL )
-
-	response, err := clam.ScanStream( reader )
-	if err != nil {
-		return false, err
-	}
-	hasVirus := false
-	for s := range response {
-		if s != "stream: OK" {
-			ctx.Logger.Printf("%v %v\n", s )
-			hasVirus = true
-		}
-	}
-
-	ctx.Logger.Println( "Result of scan:", hasVirus )
-
-	return hasVirus, nil
-}

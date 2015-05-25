@@ -47,7 +47,7 @@ func TestInterceptor( t *testing.T ) {
 
 	bodyText := "This is the request body"
 
-	fw := NewForwarder( tsURL, testInterceptor( func( w http.ResponseWriter, req *http.Request, body io.Reader ) bool {
+	fw := NewForwarder( tsURL, 10000, testInterceptor( func( w http.ResponseWriter, req *http.Request, body io.Reader ) bool {
 		buf := make([]byte,10000)
 		if n, err := body.Read(buf); err != nil && err != io.EOF {
 			t.Fatalf( "Got error reading body: %s", err.Error() )
@@ -109,7 +109,7 @@ func TestForwarding( t *testing.T ) {
 	defer ts.Close()
 	tsURL, _ := url.Parse(ts.URL)
 
-	fw := NewForwarder( tsURL, nil )
+	fw := NewForwarder( tsURL, 10000, nil )
 
 	req, _ := http.NewRequest( "POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText) )
 	req.Header.Set( "myheader", "headervalue" )
