@@ -35,6 +35,7 @@ func (c *ClamInterceptor) Handle( w http.ResponseWriter, req *http.Request, body
 	// Don't care unless it's a post
 	//
 	if req.Method != "POST" && req.Method != "PUT" && req.Method != "PATCH" {
+		ctx.Logger.Println( "No need to handle method", req.Method )
 		return false
 	}
 
@@ -43,13 +44,16 @@ func (c *ClamInterceptor) Handle( w http.ResponseWriter, req *http.Request, body
 	//
 	content_type, params, err := mime.ParseMediaType( req.Header.Get( "Content-Type" ) )
 	if err != nil {
+		ctx.Logger.Println( "Unable to parse media type:", err )
 		return false
 	}
 	if content_type != "multipart/form-data" {
+		ctx.Logger.Println( "Content type is not multipart/form-data: ", content_type )
 		return false
 	}
 	boundary := params["boundary"]
 	if boundary == "" {
+		ctx.Logger.Println( "Multipart boundary is not defined" )
 		return false
 	}
 
@@ -63,6 +67,7 @@ func (c *ClamInterceptor) Handle( w http.ResponseWriter, req *http.Request, body
 			if err == io.EOF {
 				break // all done
 			}
+			ctx.Logger.Println( "Error parsing multipart form:", err )
 			w.WriteHeader( 500 )
 			w.Write( []byte(fmt.Sprintf( "Error parsing multipart form: %v", err )) )
 			return true
