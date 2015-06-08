@@ -72,6 +72,8 @@ type ApplicationConfig struct {
 	TestPages bool               `gcfg:"test-pages"`
 	// If true, will log the progression of each request through the forwarder
 	Debug bool                   `gcfg:"debug"`
+	// If true, will log the annoying clamd messages
+	DebugClam bool               `gcfg:"debug-clam"`
 }
 
 //
@@ -87,6 +89,7 @@ var DefaultApplicationConfig = ApplicationConfig{
 	Logfile:                "",
 	TestPages:              true,
 	Debug:                  false,
+	DebugClam:              false,
 }
 
 //
@@ -97,7 +100,6 @@ type Ctx struct {
 	ApplicationURL *url.URL
 	ClamInterceptor *ClamInterceptor
 	Logger *log.Logger
-	Debug bool
 	Listener net.Listener
 	ActivityChan chan int
 	ShuttingDown bool
@@ -175,7 +177,9 @@ func main() {
 	}
 	router.HandleFunc( "/", scanForwardHandler )
 
-	log.SetOutput( ioutil.Discard ) // go-clamd has irritating logging, so turn it off
+	if ! ctx.Config.App.DebugClam {
+		log.SetOutput( ioutil.Discard ) // go-clamd has irritating logging, so turn it off
+	}
 
 	if listener, err := getListener( ctx.Config.App.Listen, socketPerms ); err != nil {
 		ctx.Logger.Fatal( "Unable to listen on: ", ctx.Config.App.Listen, ", reason: ", err )
@@ -191,14 +195,18 @@ func main() {
  * Starts logging
  */
 func startLogging() {
-	ctx.Logger = log.New( os.Stdout, "", log.LstdFlags )
-	if ctx.Config.App.Logfile != "" {
-		w, err := os.OpenFile( ctx.Config.App.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660 )
-		if err == nil {
-			ctx.Logger = log.New( w, "", log.LstdFlags )
-		} else {
-			log.Fatal( "Failed to open log file", ctx.Config.App.Logfile, ":", err )
+	if ctx.Config.App.Debug {
+		ctx.Logger = log.New( os.Stdout, "", log.LstdFlags )
+		if ctx.Config.App.Logfile != "" {
+			w, err := os.OpenFile( ctx.Config.App.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660 )
+			if err == nil {
+				ctx.Logger = log.New( w, "", log.LstdFlags )
+			} else {
+				log.Fatal( "Failed to open log file", ctx.Config.App.Logfile, ":", err )
+			}
 		}
+	} else {
+		ctx.Logger = log.New( ioutil.Discard, "", log.LstdFlags )
 	}
 }
 

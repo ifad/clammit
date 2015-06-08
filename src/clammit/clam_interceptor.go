@@ -62,6 +62,7 @@ func (c *ClamInterceptor) Handle( w http.ResponseWriter, req *http.Request, body
 	//
 	// Scan them
 	//
+	count := 0
 	for {
 		if part, err := reader.NextPart(); err != nil {
 			if err == io.EOF {
@@ -72,6 +73,7 @@ func (c *ClamInterceptor) Handle( w http.ResponseWriter, req *http.Request, body
 			w.Write( []byte(fmt.Sprintf( "Error parsing multipart form: %v", err )) )
 			return true
 		} else {
+			count++
 			if part.FileName() != "" {
 				defer part.Close()
 				ctx.Logger.Println( "Scanning",part.FileName() )
@@ -88,6 +90,8 @@ func (c *ClamInterceptor) Handle( w http.ResponseWriter, req *http.Request, body
 		}
 	}
 
+	ctx.Logger.Printf( "Processed %d form parts", count )
+
 	return false
 }
 
@@ -97,6 +101,8 @@ func (c *ClamInterceptor) Handle( w http.ResponseWriter, req *http.Request, body
 func (c *ClamInterceptor) Scan( reader io.Reader ) (bool, error) {
 
 	clam := clamd.NewClamd( c.ClamdURL )
+
+	ctx.Logger.Println( "Sending to clamav" )
 
 	response, err := clam.ScanStream( reader )
 	if err != nil {
