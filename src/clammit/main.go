@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"runtime"
 )
 
 //
@@ -74,6 +75,8 @@ type ApplicationConfig struct {
 	Debug bool                   `gcfg:"debug"`
 	// If true, will log the annoying clamd messages
 	DebugClam bool               `gcfg:"debug-clam"`
+	// Number of CPU threads to use
+	NumThreads int               `gcfg:"num-threads"`
 }
 
 //
@@ -90,6 +93,7 @@ var DefaultApplicationConfig = ApplicationConfig{
 	TestPages:              true,
 	Debug:                  false,
 	DebugClam:              false,
+	NumThreads:             runtime.NumCPU(),
 }
 
 //
@@ -151,6 +155,9 @@ func main() {
 			log.Fatalf( "SocketPerms invalid (expected 4-digit octal: %s", err.Error )
 		}
 	}
+
+	// Allow multi-proc
+	runtime.GOMAXPROCS(ctx.Config.App.NumThreads)
 
 	startLogging()
 

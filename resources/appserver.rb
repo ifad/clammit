@@ -11,7 +11,9 @@ set :port, 6200
 
 post '*' do
   puts "-------- the file ----------------------"
-  puts request[:qqfile][:tempfile].read
+  if request[:qqfile]
+    puts request[:qqfile][:tempfile].read
+  end
   puts "-------- the file ----------------------"
   "It works!"
 end

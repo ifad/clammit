@@ -111,12 +111,12 @@ func (c *ClamInterceptor) Scan( reader io.Reader ) (bool, error) {
 	hasVirus := false
 	for s := range response {
 		if s != "stream: OK" {
-			ctx.Logger.Printf("%v", s )
+			ctx.Logger.Printf("  %v", s )
 			hasVirus = true
 		}
 	}
 
-	ctx.Logger.Println( "Result of scan:", hasVirus )
+	ctx.Logger.Println( "  result of scan:", hasVirus )
 
 	return hasVirus, nil
 }
