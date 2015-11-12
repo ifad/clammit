@@ -5,13 +5,13 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
-	"io"
-	"bytes"
 	"path/filepath"
 )
 
@@ -35,7 +35,7 @@ func main() {
 	params := map[string]string{}
 
 	for i := 0; i < count; i++ {
-		fmt.Println( "Send request:",i)
+		fmt.Println("Send request:", i)
 		req, err := newFileUploadRequest(requestUrl, params, fileParameter, filename)
 		if err != nil {
 			fmt.Println("Could not create upload request:", err)
@@ -82,7 +82,7 @@ func newFileUploadRequest(uri string, params map[string]string, paramName, path 
 
 	req, err := http.NewRequest("POST", uri, body)
 	if err == nil {
-		req.Header.Set( "Content-Type", writer.FormDataContentType() )
+		req.Header.Set("Content-Type", writer.FormDataContentType())
 	}
 	return req, err
 }

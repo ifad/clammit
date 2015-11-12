@@ -1,10 +1,10 @@
 package forwarder
 
 import (
-	"io"
-	"os"
 	"clammit/multireader"
 	"clammit/scratch"
+	"io"
+	"os"
 )
 
 const (
@@ -53,11 +53,11 @@ type BodyHolder interface {
  * read to construct the BodyHolder, so you will not be able to perform any
  * more operations on it afterwards and you should Close() it (if possible).
  */
-func NewBodyHolder( input io.Reader, contentLength int64, maxContentLength int64 ) (BodyHolder, error) {
+func NewBodyHolder(input io.Reader, contentLength int64, maxContentLength int64) (BodyHolder, error) {
 	if contentLength == 0 || contentLength > maxContentLength {
-		return newFileBodyHolder( input )
+		return newFileBodyHolder(input)
 	} else {
-		return multireader.New( input, contentLength )
+		return multireader.New(input, contentLength)
 	}
 }
 
@@ -65,8 +65,8 @@ func NewBodyHolder( input io.Reader, contentLength int64, maxContentLength int64
  * File storage version of the BodyHolder
  */
 type fileBodyHolder struct {
-	scratchArea *scratch.ScratchArea
-	bodyFilename string
+	scratchArea   *scratch.ScratchArea
+	bodyFilename  string
 	contentLength int64
 }
 
@@ -74,20 +74,20 @@ type fileBodyHolder struct {
  * Constructs a new fileBodyHolder - it uses the scratch.ScratchArea to store
  * the file.
  */
-func newFileBodyHolder( input io.Reader ) (BodyHolder, error) {
-	sa, err := scratch.NewScratchArea( "", "clammit" )
+func newFileBodyHolder(input io.Reader) (BodyHolder, error) {
+	sa, err := scratch.NewScratchArea("", "clammit")
 	if err != nil {
 		sa.Cleanup()
 		return nil, err
 	}
-	fb := &fileBodyHolder{ scratchArea: sa  }
-	bodyFile, err := sa.NewFile( "body" )
+	fb := &fileBodyHolder{scratchArea: sa}
+	bodyFile, err := sa.NewFile("body")
 	if err != nil {
 		sa.Cleanup()
 		return nil, err
 	}
 	defer bodyFile.Close()
-	count, err := io.Copy( bodyFile, input )
+	count, err := io.Copy(bodyFile, input)
 	if err != nil {
 		sa.Cleanup()
 		return nil, err
@@ -101,7 +101,7 @@ func newFileBodyHolder( input io.Reader ) (BodyHolder, error) {
  * Implementation of BodyHolder.GetReadCloser().
  */
 func (f *fileBodyHolder) GetReadCloser() (io.ReadCloser, error) {
-	return os.Open( f.bodyFilename )
+	return os.Open(f.bodyFilename)
 }
 
 /*

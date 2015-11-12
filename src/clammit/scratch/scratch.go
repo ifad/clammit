@@ -16,14 +16,14 @@ type ScratchArea struct {
 /*
  * Constructs a new scratch area, in the given base directory, prefixed as appropriate.
  */
-func NewScratchArea( tempdir string, name string ) (*ScratchArea, error) {
+func NewScratchArea(tempdir string, name string) (*ScratchArea, error) {
 	if name == "" {
 		name = "scratch"
 	}
-	if tempDir, err := ioutil.TempDir( tempdir, name ); err != nil {
+	if tempDir, err := ioutil.TempDir(tempdir, name); err != nil {
 		return nil, err
 	} else {
-		return &ScratchArea{ TempDir: tempDir }, nil
+		return &ScratchArea{TempDir: tempDir}, nil
 	}
 }
 
@@ -31,15 +31,15 @@ func NewScratchArea( tempdir string, name string ) (*ScratchArea, error) {
  * Deletes the scratch area
  */
 func (s *ScratchArea) Cleanup() {
-	_ = os.RemoveAll( s.TempDir )
+	_ = os.RemoveAll(s.TempDir)
 }
 
 /*
  * Creates a new file in the scratch area and returns a handle to it
  */
-func (s *ScratchArea) NewFile( prefix string) (*os.File, error) {
+func (s *ScratchArea) NewFile(prefix string) (*os.File, error) {
 	if prefix == "" {
 		prefix = "scratch"
 	}
-	return ioutil.TempFile( s.TempDir, prefix )
+	return ioutil.TempFile(s.TempDir, prefix)
 }
