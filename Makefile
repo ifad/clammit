@@ -10,7 +10,7 @@ clean:
 	@rm -rf pkg/*
 
 cleanimports:
-	@rm -rf src/code.google.com
+	@rm -rf src/gopkg.in
 	@rm -rf src/github.com
 
 application:
@@ -19,7 +19,7 @@ application:
 gets:	gcfg go-clamd
 
 gcfg:
-	@[ -d src/code.google.com/p/gcfg ] || go get code.google.com/p/gcfg
+	@[ -d src/gopkg.in/gcfg.v1 ] || go get gopkg.in/gcfg.v1
 
 go-clamd:
 	@[ -d src/github.com/dutchcodes/go-clamd ] || go get github.com/dutchcoders/go-clamd
