@@ -180,7 +180,7 @@ func main() {
 	router.HandleFunc("/clammit/scan", scanHandler)
 	if ctx.Config.App.TestPages {
 		fs := http.FileServer(http.Dir("testfiles"))
-		router.Handle("/clammit/test/", http.StripPrefix("/test/", fs))
+		router.Handle("/clammit/test/", http.StripPrefix("/clammit/test/", fs))
 	}
 	router.HandleFunc("/", scanForwardHandler)
 
