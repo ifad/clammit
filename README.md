@@ -1,4 +1,4 @@
-Clammit
+# Clammit
 
 Clammit is a stand-alone application with just one task, to stand between
 the client and application and to virus-check the files in the client request.
@@ -9,17 +9,19 @@ the upstream direction.
 As the name implies, Clammit offloads the virus detection to the ClamAV virus
 detection server (clamd).
 
-### Architecture
+## Architecture
+
 Flow-wise, Clammit is straightforward. It sets up an HTTP server to accept
 incoming requests (main.go):
+
 1. Each request is passed to the forwarder (forwarder/forwarder.go)
 2. The forwarder dowloads the request body (as it will be used at least twice)
-3. The forwarder passes the request to the clam interceptor (clam_interceptor.go)
+3. The forwarder passes the request to the clam interceptor (clam\_interceptor.go)
 4. The only request that will be tested will have methods POST/PUT/PATCH and content-type "multipart/form-data"
 5. The clam interceptor locates and sends each form-data field to ClamD
 6. For any positive response, the interceptor will write an HTTP response and return (and the forwarder will not attempt to forward the request)
 7. If the interceptor OKs the request, the forwarder constructs a new HTTP request and forwards to the application
-8. The application's response is returned as the response to the original request.
+8. The application's response is returned as the response to the original request
 
 ## Building
 Clammit is requires the Go compiler, version 1.2 or above. It also requires ```make```
