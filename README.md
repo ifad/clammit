@@ -1,6 +1,7 @@
 # Clammit
 
 [![Build Status](https://travis-ci.org/ifad/clammit.svg)](https://travis-ci.org/ifad/clammit)
+[![Code Climate](https://codeclimate.com/github/ifad/clammit/badges/gpa.svg)](https://codeclimate.com/github/ifad/clammit)
 
 Clammit is a stand-alone application with just one task, to stand between
 the client and application and to virus-check the files in the client request.
