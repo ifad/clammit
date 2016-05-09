@@ -1,5 +1,7 @@
 # Clammit
 
+[![Build Status](https://travis-ci.org/ifad/clammit.svg)](https://travis-ci.org/ifad/clammit)
+
 Clammit is a stand-alone application with just one task, to stand between
 the client and application and to virus-check the files in the client request.
 If a virus exists, it will reject the request out of hand. If no virus exists,
