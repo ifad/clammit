@@ -145,11 +145,7 @@ Run ```make test```
 
 ## Licence
 
-MIT
-
-## Copyright
-
-&copy; IFAD 2015
+[MIT](https://github.com/ifad/clammit/blob/master/LICENSE)
 
 [gcfg]:                http://code.google.com/p/gcfg
 [go-clamd]:            http://github.com/dutchcoders/go-clamd
