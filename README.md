@@ -3,14 +3,106 @@
 [![Build Status](https://travis-ci.org/ifad/clammit.svg)](https://travis-ci.org/ifad/clammit)
 [![Code Climate](https://codeclimate.com/github/ifad/clammit/badges/gpa.svg)](https://codeclimate.com/github/ifad/clammit)
 
-Clammit is a stand-alone application with just one task, to stand between
-the client and application and to virus-check the files in the client request.
-If a virus exists, it will reject the request out of hand. If no virus exists,
-the request is then forwarded to the application and its response returned in
-the upstream direction.
+Clammit is a proxy that will perform virus scans of files uploaded via
+`multipart/form-data`.  If a virus exists, it will reject the request out of
+hand. If no virus exists, the request is then forwarded to the application and
+it's response returned in the upstream direction.
 
 As the name implies, Clammit offloads the virus detection to the ClamAV virus
 detection server (clamd).
+
+## Usage
+
+Clammit is intended to be used as an internal proxy, a sort of middleware. It
+is best to only pass requests that include a file upload, however requests that
+aren't `POST`/`PUT`/`PATCH` are passed through directly without being scanned.
+
+As an example, say you have a Rails application that is configured in Nginx
+like this:
+
+```nginx
+set $my_app /myapp;
+
+server {
+  listen 80;
+  server_name my_app.com;
+
+  root $my_app/public;
+  try_files $uri/index.html $uri @app;
+
+  location @app {
+    access_log /var/log/nginx/my_app-access.log;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_pass http://unix:$my_app/.unicorn.sock;
+  }
+
+  error_page 500 502 503 504 /500.html;
+  client_max_body_size 4G;
+  keepalive_timeout 10;
+}
+```
+
+Assuming you receive document uploads at `POST /documents`, to check them with
+Clammit add another location block like this:
+
+```nginx
+  set $clammit_app /clammit;
+
+  location /documents {
+    access_log /var/log/nginx/my_app-access.log;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Clammit-Backend unix:$my_app/.unicorn.sock;
+    proxy_pass http://unix:$clammit_app/.unicorn.sock;
+  }
+```
+
+All requests to `/documents` will then pass through Clammit, and uploads will
+be scanned for viruses. To your application the request will just appear as
+coming from Nginx, all cookies and the headers will be kept intact.
+
+If a virus is detected, Clammit will reject the request (with a `418` status
+code), and not forward it to your application. If you use an AJAX uploader, you
+can interpret this response and show a nice error message to end users. Or you
+could set a custom error page in Nginx.
+
+## Configuration
+
+You will need to create and edit a configuration file. An example is found in etc.sample/
+
+The configuration is pretty simple:
+
+```ini
+[ application ]
+listen          = :8438
+application-url = http://host:port/path
+clamd-url       = http://host:port/
+log-file        = /var/log/clammit.log
+debug           = true
+test-pages      = true
+```
+
+Setting         | Description
+:---------------| :-----------------------------------------------------------------------------
+listen          | The listen address (see below)
+clamd-url       | The URL of the clamd server
+application-url | (Optional) Forward all requests to this application
+log-file        | (Optional) The clammit log file, if ommitted will log to stdout
+test-pages      | (Optional) If true, clammit will also offer up a page to perform test uploads
+debug           | (Optional) If true, more things will be logged
+debug-clam      | (Optional) If true, the response from ClamAV will be logged
+
+The listen address can be a TCP port or Unix socket, e.g.:
+
+* `0.0.0.0:8438`       - Listen on all IPs on port 8438
+* `unix:.clammit.sock` - Listen on a Unix socket
+
+The same format applies to the `clamd-url` and `application-url` parameters.
+
+By default Clammit will look for a `X-Clammit-Backend` header, and use that to
+decide where to send requests to. If you only have one backend server, you can
+set it in the `application-url` configuration option, and omit the header.
 
 ## Architecture
 
@@ -27,6 +119,7 @@ incoming requests (main.go):
 8. The application's response is returned as the response to the original request
 
 ## Building
+
 Clammit is requires the Go compiler, version 1.2 or above. It also requires ```make```
 to ease compilation. The makefile is pretty simple, though, so you can perform its
 steps manually if you want.
@@ -35,6 +128,7 @@ You will need external access to github and code.google.com to load the
 third-party packages that Clammit depends on: [go-clamd][] and [gcfg][].
 
 Once you have this, simple run:
+
 ```sh
 make
 ```
@@ -50,50 +144,6 @@ make cleanimports | Removes the downloaded third-party source packages
 make gets         | Downloads the third-party source packages, if they are not already there
 make test         | Runs the application unit tests
 
-## Running
-
-You will need to create and edit a configuration file. An example is found in etc.sample/
-
-The configuration is pretty simple:
-
-```ini
-  [ application ]
-  listen          = :8438
-  application-url = http://host:port/path
-  clamd-url       = http://host:port/
-  log-file        = /var/log/clammit.log
-  test-pages      = true
-```
-
-Setting         | Description
-:---------------| :-----------------------------------------------------------------------------
-listen          | The listen address (see below)
-application-url | The URL to forward the request to (including path!)
-clamd-url       | The URL of the clamd server
-log-file        | (Optional) The clammit log file
-test-pages      | (Optional) If true, clammit will also offer up a page to perform test uploads
-
-### Listen address
-
-This configuration setting allows you to specify TCP address:port or Unix socket filename.
-You can specify one of these forms:
-
-* tcp:host:port        (listens on one TCP interface, IPv4 and IPv6)
-* tcp:port             (listens on all interfaces)
-* tcp4:host:port       (listens on one TCP4 interface)
-* tcp4:port            (listens on all TCP4 interfaces)
-* tcp6:[host]:port     (listens on one TCP6 interface)
-* tcp6:port            (listens on all TCP6 interfaces)
-* unix:filename        (listen on Unix socket)
-* host:port            (assumes TCP)
-* :port                (assumes TCP)
-
-If you wish to only listen on IPv6 addresses with the tcp: scheme, the
-host should be encapsulated within brackets, e.g. tcp:[::1]:1234
-
-Using scheme unix:, Clammit will abort with an error "bind: address already in
- use" if the socket file exists. It will delete it on shutdown.
-
 ## Installation
 
 1. Copy the compiled binary (bin/clammit), either into your project repository, or to an installation area.
@@ -101,11 +151,10 @@ Using scheme unix:, Clammit will abort with an error "bind: address already in
 3. Configure your auto-start mechanism, be it God or init.d
 4. Configure the upstream webserver to forward appropriate POST requests to clammit.
 
-## Calling Clammit
+## API
 
-Clammit's own actions are grouped under the "/clammit" path (see below). Any
-other request will be scanned (POST and PUT only) then forwarded to the
-application.
+Clammit's own actions are grouped under the "/clammit" path. You should ensure
+that these are not available externally.
 
 ### Info
 
