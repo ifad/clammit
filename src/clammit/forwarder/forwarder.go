@@ -46,6 +46,7 @@ type Forwarder struct {
 	applicationURL         *url.URL
 	interceptor            Interceptor
 	logger                 *log.Logger
+	debug                  bool
 	contentMemoryThreshold int64
 }
 
@@ -65,11 +66,12 @@ func NewForwarder(applicationURL *url.URL, contentMemoryThreshold int64, interce
  * Sets the logger. The default is to log nothing, so if you wish for forwarder
  * debug information, you will need to call this method.
  */
-func (f *Forwarder) SetLogger(logger *log.Logger) {
+func (f *Forwarder) SetLogger(logger *log.Logger, debug bool) {
 	if logger == nil {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
 	f.logger = logger
+	f.debug = debug
 }
 
 /*
@@ -86,7 +88,9 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 		}
 	}()
 
-	f.logger.Println("Received scan request")
+	if f.debug {
+		f.logger.Println("Received scan request")
+	}
 
 	//
 	// Save the request body
@@ -104,7 +108,9 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	// Allow the interceptor its chance
 	//
 	if f.interceptor != nil {
-		f.logger.Println("Passing to interceptor")
+		if f.debug {
+			f.logger.Println("Passing to interceptor")
+		}
 		r, _ := bodyHolder.GetReadCloser()
 		defer r.Close()
 		if f.interceptor.Handle(w, req, r) {
@@ -112,7 +118,10 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	f.logger.Println("Interceptor passed this request")
+
+	if f.debug {
+		f.logger.Println("Interceptor passed this request")
+	}
 
 	//
 	// Forward the request to the configured server
@@ -133,6 +142,7 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if resp.Body != nil {
+		f.logger.Printf("Request forwarded, response %s\n", resp.Status)
 		defer resp.Body.Close()
 	}
 
@@ -210,7 +220,7 @@ func (f *Forwarder) getClient(req *http.Request) (*http.Client, *url.URL) {
 		Fragment: req.URL.Fragment,
 	}
 	if applicationURL.Scheme == "unix" {
-		f.logger.Printf("Will forward to: %s on unix socket %s", req.URL.Path, applicationURL.Path)
+		f.logger.Printf("Forwarding to unix socket %s", applicationURL.Path)
 		url.Scheme = "http"
 		url.Host = "x"
 		jar, _ := cookiejar.New(nil)
@@ -223,7 +233,7 @@ func (f *Forwarder) getClient(req *http.Request) (*http.Client, *url.URL) {
 			},
 		}, url
 	} else {
-		f.logger.Printf("Will forward to: %s at %s", req.URL.Path, applicationURL.String())
+		f.logger.Printf("Forwarding to %s", applicationURL.String())
 		return &http.Client{}, url
 	}
 }

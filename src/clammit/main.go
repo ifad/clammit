@@ -9,11 +9,11 @@ package main
 import (
 	"bytes"
 	"clammit/forwarder"
-	"gopkg.in/gcfg.v1"
 	"encoding/json"
 	"flag"
 	"fmt"
 	clamd "github.com/dutchcoders/go-clamd"
+	"gopkg.in/gcfg.v1"
 	"io/ioutil"
 	"log"
 	"net"
@@ -202,18 +202,16 @@ func main() {
  * Starts logging
  */
 func startLogging() {
-	if ctx.Config.App.Debug {
-		ctx.Logger = log.New(os.Stdout, "", log.LstdFlags)
-		if ctx.Config.App.Logfile != "" {
-			w, err := os.OpenFile(ctx.Config.App.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
-			if err == nil {
-				ctx.Logger = log.New(w, "", log.LstdFlags)
-			} else {
-				log.Fatal("Failed to open log file", ctx.Config.App.Logfile, ":", err)
-			}
+	if ctx.Config.App.Logfile != "" {
+		w, err := os.OpenFile(ctx.Config.App.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
+		if err == nil {
+			ctx.Logger = log.New(w, "", log.LstdFlags)
+		} else {
+			log.Fatal("Failed to open log file", ctx.Config.App.Logfile, ":", err)
 		}
 	} else {
-		ctx.Logger = log.New(ioutil.Discard, "", log.LstdFlags)
+		ctx.Logger = log.New(os.Stdout, "", log.LstdFlags)
+		ctx.Logger.Println("No log file configured - using stdout")
 	}
 }
 
@@ -330,7 +328,7 @@ func scanForwardHandler(w http.ResponseWriter, req *http.Request) {
 	defer func() { ctx.ActivityChan <- -1 }()
 
 	fw := forwarder.NewForwarder(ctx.ApplicationURL, ctx.Config.App.ContentMemoryThreshold, ctx.ClamInterceptor)
-	fw.SetLogger(ctx.Logger)
+	fw.SetLogger(ctx.Logger, ctx.Config.App.Debug)
 	fw.HandleRequest(w, req)
 }
 
