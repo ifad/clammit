@@ -13,9 +13,9 @@
 listen          = unix:.clammit.sock
 
 #
-# URL of the application method that you will forward virus-free requests to
+# Ignore the `X-Clammit-Backend` header, and forward all requests to this application
 #
-application-url = http://localhost:9240/
+#application-url = http://localhost:9240/
 
 #
 # URL of the CLAMD server
@@ -24,10 +24,10 @@ application-url = http://localhost:9240/
 clamd-url       = unix:/var/run/clamav/clamd.ctl
 
 # Set this to a log file to redirect all output
-#log-file        = log/clammit.log
+log-file        = log/clammit.log
 
 #
 # Set this to true to have this application serve an upload form to test
 # the virus scanning
 #
-test-pages      = true
+#test-pages      = true

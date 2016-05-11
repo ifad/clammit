@@ -2,6 +2,7 @@ package forwarder
 
 import (
 	"bytes"
+	"gopkg.in/stretchr/testify.v1/assert"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -129,4 +130,59 @@ func TestForwarding(t *testing.T) {
 	if w.Body.String() != responseText {
 		t.Fatalf("Response: Body is: %s", w.Body.String())
 	}
+}
+
+func TestMutliForwarder(t *testing.T) {
+	requestText := "This is a request"
+
+	fw := NewForwarder(nil, 10000, nil)
+
+	// Build two backends
+	backend1ResponseText := "backend1"
+	backend1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(202)
+		w.Write([]byte(backend1ResponseText))
+	}))
+	defer backend1.Close()
+	backend1URL, _ := url.Parse(backend1.URL)
+
+	backend2ResponseText := "backend2"
+	backend2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(202)
+		w.Write([]byte(backend2ResponseText))
+	}))
+	defer backend2.Close()
+	backend2URL, _ := url.Parse(backend2.URL)
+
+	// Ensure they have different urls
+	assert.NotEqual(t, backend1URL, backend2URL)
+
+	// Test a request for backend1
+	req1, _ := http.NewRequest("POST", "http://localhost:99999/bar", strings.NewReader(requestText))
+	req1.Header.Set("X-Clammit-Backend", backend1URL.String())
+	w1 := NewTestResponseWriter()
+
+	fw.HandleRequest(w1, req1)
+
+	assert.Equal(t, w1.StatusCode, 202)
+	assert.Equal(t, w1.Body.String(), backend1ResponseText)
+
+	// Test a request for backend2
+	req2, _ := http.NewRequest("POST", "http://localhost:99999/bar", strings.NewReader(requestText))
+	req2.Header.Set("X-Clammit-Backend", backend2URL.String())
+	w2 := NewTestResponseWriter()
+
+	fw.HandleRequest(w2, req2)
+
+	assert.Equal(t, w2.StatusCode, 202)
+	assert.Equal(t, w2.Body.String(), backend2ResponseText)
+
+	// Test a request without the backend header
+	req3, _ := http.NewRequest("POST", "http://localhost:99999/bar", strings.NewReader(requestText))
+	w3 := NewTestResponseWriter()
+
+	fw.HandleRequest(w3, req3)
+
+	assert.Equal(t, w3.StatusCode, 500)
+	assert.Equal(t, w3.Body.String(), "Internal Server Error\n")
 }

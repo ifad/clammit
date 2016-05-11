@@ -20,6 +20,8 @@ import (
 	"strings"
 )
 
+const applicationUrlHeader string = "X-Clammit-Backend"
+
 /*
  * The Interceptor will be passed the request to examine and pass.
  *
@@ -44,6 +46,7 @@ type Forwarder struct {
 	applicationURL         *url.URL
 	interceptor            Interceptor
 	logger                 *log.Logger
+	debug                  bool
 	contentMemoryThreshold int64
 }
 
@@ -63,18 +66,31 @@ func NewForwarder(applicationURL *url.URL, contentMemoryThreshold int64, interce
  * Sets the logger. The default is to log nothing, so if you wish for forwarder
  * debug information, you will need to call this method.
  */
-func (f *Forwarder) SetLogger(logger *log.Logger) {
+func (f *Forwarder) SetLogger(logger *log.Logger, debug bool) {
 	if logger == nil {
 		logger = log.New(ioutil.Discard, "", 0)
 	}
 	f.logger = logger
+	f.debug = debug
 }
 
 /*
  * Handles the given HTTP request.
  */
 func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
-	f.logger.Println("Received scan request")
+	// Catch panics and return a 500 Internal Server Error
+	defer func() {
+		if err := recover(); err != nil {
+			f.logger.Printf("ERROR %s", err)
+
+			// Return 500 response
+			http.Error(w, "Internal Server Error", 500)
+		}
+	}()
+
+	if f.debug {
+		f.logger.Println("Received scan request")
+	}
 
 	//
 	// Save the request body
@@ -92,7 +108,9 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	// Allow the interceptor its chance
 	//
 	if f.interceptor != nil {
-		f.logger.Println("Passing to interceptor")
+		if f.debug {
+			f.logger.Println("Passing to interceptor")
+		}
 		r, _ := bodyHolder.GetReadCloser()
 		defer r.Close()
 		if f.interceptor.Handle(w, req, r) {
@@ -100,14 +118,17 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	f.logger.Println("Interceptor passed this request")
+
+	if f.debug {
+		f.logger.Println("Interceptor passed this request")
+	}
 
 	//
 	// Forward the request to the configured server
 	//
 	body, _ := bodyHolder.GetReadCloser()
 	defer body.Close()
-	resp, _ := f.forwardRequest(req, body, bodyHolder.ContentLength())
+	resp, err := f.forwardRequest(req, body, bodyHolder.ContentLength())
 	if err != nil {
 		f.logger.Printf("Failed to forward request: %s", err.Error())
 		w.WriteHeader(500)
@@ -121,6 +142,7 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if resp.Body != nil {
+		f.logger.Printf("Request forwarded, response %s\n", resp.Status)
 		defer resp.Body.Close()
 	}
 
@@ -163,21 +185,42 @@ func (f *Forwarder) forwardRequest(req *http.Request, body io.Reader, contentLen
 	return client.Do(freq)
 }
 
+func (f *Forwarder) getApplicationURL(req *http.Request) *url.URL {
+	// Return the applicationURL if it's set
+	if f.applicationURL != nil && f.applicationURL.String() != "" {
+		return f.applicationURL
+	}
+
+	// Otherwise check for the X-Clammit-Backend header
+	url, err := url.Parse(req.Header.Get(applicationUrlHeader))
+	if err != nil {
+		f.logger.Panicf("Error parsing application URL in %s: %s (%s)", applicationUrlHeader, err.Error(), req.Header.Get(applicationUrlHeader))
+		return nil
+	}
+
+	if len(url.String()) == 0 {
+		f.logger.Panicf("No application URL available - header %s is blank", applicationUrlHeader)
+	}
+
+	return url
+}
+
 /*
  * Gets an appropriate net/http.Client. I'm not sure if this is necessary, but it forces the issue.
  */
 func (f *Forwarder) getClient(req *http.Request) (*http.Client, *url.URL) {
+	applicationURL := f.getApplicationURL(req)
 	url := &url.URL{
-		Scheme:   f.applicationURL.Scheme,
-		Opaque:   f.applicationURL.Opaque,
-		User:     f.applicationURL.User, // TODO: clone this
-		Host:     f.applicationURL.Host,
+		Scheme:   applicationURL.Scheme,
+		Opaque:   applicationURL.Opaque,
+		User:     applicationURL.User, // TODO: clone this
+		Host:     applicationURL.Host,
 		Path:     req.URL.Path,
 		RawQuery: req.URL.RawQuery,
 		Fragment: req.URL.Fragment,
 	}
-	if f.applicationURL.Scheme == "unix" {
-		f.logger.Printf("Will forward to: %s on unix socket %s", req.URL.Path, f.applicationURL.Path)
+	if applicationURL.Scheme == "unix" {
+		f.logger.Printf("Forwarding to unix socket %s", applicationURL.Path)
 		url.Scheme = "http"
 		url.Host = "x"
 		jar, _ := cookiejar.New(nil)
@@ -185,12 +228,12 @@ func (f *Forwarder) getClient(req *http.Request) (*http.Client, *url.URL) {
 			Jar: jar,
 			Transport: &http.Transport{
 				Dial: func(network, addr string) (net.Conn, error) {
-					return net.Dial("unix", f.applicationURL.Path)
+					return net.Dial("unix", applicationURL.Path)
 				},
 			},
 		}, url
 	} else {
-		f.logger.Printf("Will forward to: %s at %s", req.URL.Path, f.applicationURL.String())
+		f.logger.Printf("Forwarding to %s", applicationURL.String())
 		return &http.Client{}, url
 	}
 }

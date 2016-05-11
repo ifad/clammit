@@ -35,9 +35,13 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 	// Don't care unless it's a post
 	//
 	if req.Method != "POST" && req.Method != "PUT" && req.Method != "PATCH" {
-		ctx.Logger.Println("No need to handle method", req.Method)
+		if ctx.Config.App.Debug {
+			ctx.Logger.Println("No need to handle method", req.Method)
+		}
 		return false
 	}
+
+	ctx.Logger.Printf("New request %s %s from %s (%s)\n", req.Method, req.URL.Path, req.RemoteAddr, req.Header.Get("X-Forwarded-For"))
 
 	//
 	// Find any attachments
@@ -76,7 +80,9 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 			count++
 			if part.FileName() != "" {
 				defer part.Close()
-				ctx.Logger.Println("Scanning", part.FileName())
+				if ctx.Config.App.Debug {
+					ctx.Logger.Println("Scanning", part.FileName())
+				}
 				if hasVirus, err := c.Scan(part); err != nil {
 					w.WriteHeader(500)
 					w.Write([]byte(fmt.Sprintf("Unable to scan a file (%s): %v", part.FileName(), err)))
@@ -90,7 +96,9 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 		}
 	}
 
-	ctx.Logger.Printf("Processed %d form parts", count)
+	if ctx.Config.App.Debug {
+		ctx.Logger.Printf("Processed %d form parts", count)
+	}
 
 	return false
 }
@@ -102,7 +110,9 @@ func (c *ClamInterceptor) Scan(reader io.Reader) (bool, error) {
 
 	clam := clamd.NewClamd(c.ClamdURL)
 
-	ctx.Logger.Println("Sending to clamav")
+	if ctx.Config.App.Debug {
+		ctx.Logger.Println("Sending to clamav")
+	}
 
 	response, err := clam.ScanStream(reader)
 	if err != nil {
@@ -111,12 +121,16 @@ func (c *ClamInterceptor) Scan(reader io.Reader) (bool, error) {
 	hasVirus := false
 	for s := range response {
 		if s != "stream: OK" {
-			ctx.Logger.Printf("  %v", s)
+			if ctx.Config.App.Debug {
+				ctx.Logger.Printf("  %v", s)
+			}
 			hasVirus = true
 		}
 	}
 
-	ctx.Logger.Println("  result of scan:", hasVirus)
+	if ctx.Config.App.Debug {
+		ctx.Logger.Println("  result of scan:", hasVirus)
+	}
 
 	return hasVirus, nil
 }
