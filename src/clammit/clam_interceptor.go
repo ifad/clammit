@@ -73,8 +73,7 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 				break // all done
 			}
 			ctx.Logger.Println("Error parsing multipart form:", err)
-			w.WriteHeader(500)
-			w.Write([]byte(fmt.Sprintf("Error parsing multipart form: %v", err)))
+			http.Error(w, "Bad Request", 400)
 			return true
 		} else {
 			count++
@@ -84,8 +83,8 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 					ctx.Logger.Println("Scanning", part.FileName())
 				}
 				if hasVirus, err := c.Scan(part); err != nil {
-					w.WriteHeader(500)
-					w.Write([]byte(fmt.Sprintf("Unable to scan a file (%s): %v", part.FileName(), err)))
+					ctx.Logger.Printf("Unable to scan file (%s): %v\n", part.FileName(), err)
+					http.Error(w, "Internal Server Error", 500)
 					return true
 				} else if hasVirus {
 					w.WriteHeader(c.VirusStatusCode)

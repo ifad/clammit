@@ -98,8 +98,7 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	bodyHolder, err := NewBodyHolder(req.Body, req.ContentLength, f.contentMemoryThreshold)
 	if err != nil {
 		f.logger.Println("Unable to save body to local store: %s", err.Error())
-		w.WriteHeader(503)
-		w.Write([]byte("Clammit is unable to save body to local store"))
+		http.Error(w, "Internal Server Error", 500)
 		return
 	}
 	defer bodyHolder.Close()
@@ -131,14 +130,12 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	resp, err := f.forwardRequest(req, body, bodyHolder.ContentLength())
 	if err != nil {
 		f.logger.Printf("Failed to forward request: %s", err.Error())
-		w.WriteHeader(500)
-		w.Write([]byte("Clammit is unable to forward the request"))
+		http.Error(w, "Bad Gateway", 502)
 		return
 	}
 	if resp == nil {
 		f.logger.Printf("Failed to forward request: no response at all")
-		w.WriteHeader(500)
-		w.Write([]byte("Clammit is unable to forward the request"))
+		http.Error(w, "Bad Gateway", 502)
 		return
 	}
 	if resp.Body != nil {
