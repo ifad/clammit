@@ -1,5 +1,5 @@
 /*
- * The Clammit application intercepts HTTP POST requests with content-type
+ * The Clammit application intercepts HTTP POST requests including content-type
  * "multipart/form-data", forwards any "file" form-data elements to ClamAV
  * and only forwards the request to the application if ClamAV passes all
  * of these elements as virus-free.
@@ -8,11 +8,12 @@ package main
 
 import (
 	"fmt"
-	clamd "github.com/dutchcoders/go-clamd"
 	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
+
+	clamd "github.com/dutchcoders/go-clamd"
 )
 
 //
@@ -46,66 +47,84 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 	//
 	// Find any attachments
 	//
-	content_type, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+	contentType, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	if err != nil {
 		ctx.Logger.Println("Unable to parse media type:", err)
 		return false
 	}
-	if content_type != "multipart/form-data" {
-		ctx.Logger.Println("Content type is not multipart/form-data: ", content_type)
-		return false
-	}
-	boundary := params["boundary"]
-	if boundary == "" {
-		ctx.Logger.Println("Multipart boundary is not defined")
-		return false
-	}
 
-	reader := multipart.NewReader(body, boundary)
+	if contentType == "multipart/form-data" {
+		boundary := params["boundary"]
+		if boundary == "" {
+			ctx.Logger.Println("Multipart boundary is not defined")
+			return false
+		}
 
-	//
-	// Scan them
-	//
-	count := 0
-	for {
-		if part, err := reader.NextPart(); err != nil {
-			if err == io.EOF {
-				break // all done
-			}
-			ctx.Logger.Println("Error parsing multipart form:", err)
-			http.Error(w, "Bad Request", 400)
-			return true
-		} else {
-			count++
-			if part.FileName() != "" {
+		reader := multipart.NewReader(body, boundary)
+
+		//
+		// Scan them
+		//
+		count := 0
+		for {
+			if part, err := reader.NextPart(); err != nil {
+				if err == io.EOF {
+					break // all done
+				}
+				ctx.Logger.Println("Error parsing multipart form:", err)
+				http.Error(w, "Bad Request", 400)
+				return true
+			} else {
+				count++
+				filename := part.FileName()
+				if filename == "" {
+					filename = "untitled"
+				}
 				defer part.Close()
 				if ctx.Config.App.Debug {
 					ctx.Logger.Println("Scanning", part.FileName())
 				}
-				if hasVirus, err := c.Scan(part); err != nil {
-					ctx.Logger.Printf("Unable to scan file (%s): %v\n", part.FileName(), err)
-					http.Error(w, "Internal Server Error", 500)
-					return true
-				} else if hasVirus {
-					w.WriteHeader(c.VirusStatusCode)
-					w.Write([]byte(fmt.Sprintf("File %s has a virus!", part.FileName())))
+				if responded := c.respondOnVirus(w, filename, part); responded == true {
 					return true
 				}
 			}
 		}
+		if ctx.Config.App.Debug {
+			ctx.Logger.Printf("Processed %d form parts", count)
+		}
+	} else {
+		filename := "untitled"
+		_, params, err := mime.ParseMediaType(req.Header.Get("Content-Disposition"))
+		if err == nil {
+			filename = params["filename"]
+		}
+		return c.respondOnVirus(w, filename, body)
 	}
+	return false
+}
 
-	if ctx.Config.App.Debug {
-		ctx.Logger.Printf("Processed %d form parts", count)
+/*
+ * This function performs the virus scan and handles the http response in case of a virus.
+ *
+ * returns True if a virus has been found and a http error response has been written
+ */
+func (c *ClamInterceptor) respondOnVirus(w http.ResponseWriter, filename string, reader io.Reader) bool {
+	if hasVirus, err := c.scan(reader); err != nil {
+		ctx.Logger.Printf("Unable to scan file (%s): %v\n", filename, err)
+		http.Error(w, "Internal Server Error", 500)
+		return true
+	} else if hasVirus {
+		w.WriteHeader(c.VirusStatusCode)
+		w.Write([]byte(fmt.Sprintf("File %s has a virus!", filename)))
+		return true
 	}
-
 	return false
 }
 
 /*
  * This function performs the actual virus scan
  */
-func (c *ClamInterceptor) Scan(reader io.Reader) (bool, error) {
+func (c *ClamInterceptor) scan(reader io.Reader) (bool, error) {
 
 	clam := clamd.NewClamd(c.ClamdURL)
 
@@ -117,6 +136,7 @@ func (c *ClamInterceptor) Scan(reader io.Reader) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	hasVirus := false
 	for s := range response {
 		if s != "stream: OK" {
