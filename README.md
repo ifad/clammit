@@ -3,8 +3,8 @@
 [![Build Status](https://travis-ci.org/ifad/clammit.svg)](https://travis-ci.org/ifad/clammit)
 [![Code Climate](https://codeclimate.com/github/ifad/clammit/badges/gpa.svg)](https://codeclimate.com/github/ifad/clammit)
 
-Clammit is a proxy that will perform virus scans of files uploaded via
-`multipart/form-data`.  If a virus exists, it will reject the request out of
+Clammit is a proxy that will perform virus scans of files uploaded via http requests,
+including `multipart/form-data`.  If a virus exists, it will reject the request out of
 hand. If no virus exists, the request is then forwarded to the application and
 it's response returned in the upstream direction.
 

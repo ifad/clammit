@@ -12,8 +12,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	clamd "github.com/dutchcoders/go-clamd"
-	"gopkg.in/gcfg.v1"
 	"io/ioutil"
 	"log"
 	"net"
@@ -25,6 +23,9 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	clamd "github.com/dutchcoders/go-clamd"
+	"gopkg.in/gcfg.v1"
 )
 
 //
@@ -169,6 +170,7 @@ func main() {
 	ctx.ClamInterceptor = &ClamInterceptor{
 		ClamdURL:        ctx.Config.App.ClamdURL,
 		VirusStatusCode: ctx.Config.App.VirusStatusCode,
+		Scan:            clamavScanner,
 	}
 
 	/*

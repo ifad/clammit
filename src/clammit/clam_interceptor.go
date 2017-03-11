@@ -16,12 +16,15 @@ import (
 	clamd "github.com/dutchcoders/go-clamd"
 )
 
+type Scanner func(ClamdURL string, reader io.Reader) (bool, error)
+
 //
 // The implementation of the ClamAV interceptor
 //
 type ClamInterceptor struct {
 	ClamdURL        string
 	VirusStatusCode int
+	Scan            Scanner
 }
 
 /*
@@ -109,7 +112,7 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
  * returns True if a virus has been found and a http error response has been written
  */
 func (c *ClamInterceptor) respondOnVirus(w http.ResponseWriter, filename string, reader io.Reader) bool {
-	if hasVirus, err := c.scan(reader); err != nil {
+	if hasVirus, err := c.Scan(c.ClamdURL, reader); err != nil {
 		ctx.Logger.Printf("Unable to scan file (%s): %v\n", filename, err)
 		http.Error(w, "Internal Server Error", 500)
 		return true
@@ -124,9 +127,9 @@ func (c *ClamInterceptor) respondOnVirus(w http.ResponseWriter, filename string,
 /*
  * This function performs the actual virus scan
  */
-func (c *ClamInterceptor) scan(reader io.Reader) (bool, error) {
+var clamavScanner = func(ClamdURL string, reader io.Reader) (bool, error) {
 
-	clam := clamd.NewClamd(c.ClamdURL)
+	clam := clamd.NewClamd(ClamdURL)
 
 	if ctx.Config.App.Debug {
 		ctx.Logger.Println("Sending to clamav")
