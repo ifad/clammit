@@ -13,15 +13,20 @@ import (
 const virusCode = 418
 
 var mockVirusFound = false
-var mockScan = func(ClamdURL string, reader io.Reader) (bool, error) {
+
+type MockScanner struct {
+}
+
+func (s MockScanner) scan(reader io.Reader) (bool, error) {
 	return mockVirusFound, nil
 }
-var clamInterceptor = ClamInterceptor{
-	ClamdURL:        "unix:/dev/null",
+
+var scanInterceptor = ScanInterceptor{
 	VirusStatusCode: virusCode,
-	Scan:            mockScan,
+	Scanner:         MockScanner{},
 }
-var handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { clamInterceptor.Handle(w, req, req.Body) })
+
+var handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { scanInterceptor.Handle(w, req, req.Body) })
 
 func TestNonMultipartRequest_VirusFound_Without_ContentDisposition(t *testing.T) {
 	setup()

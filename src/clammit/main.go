@@ -103,7 +103,7 @@ var DefaultApplicationConfig = ApplicationConfig{
 type Ctx struct {
 	Config          Config
 	ApplicationURL  *url.URL
-	ClamInterceptor *ClamInterceptor
+	ScanInterceptor *ScanInterceptor
 	Logger          *log.Logger
 	Listener        net.Listener
 	ActivityChan    chan int
@@ -167,10 +167,9 @@ func main() {
 	 */
 	ctx.ApplicationURL = checkURL(ctx.Config.App.ApplicationURL)
 	checkURL(ctx.Config.App.ClamdURL)
-	ctx.ClamInterceptor = &ClamInterceptor{
-		ClamdURL:        ctx.Config.App.ClamdURL,
+	ctx.ScanInterceptor = &ScanInterceptor{
 		VirusStatusCode: ctx.Config.App.VirusStatusCode,
-		Scan:            clamavScanner,
+		Scanner:         ClamScanner{ClamdURL: ctx.Config.App.ClamdURL},
 	}
 
 	/*
@@ -312,7 +311,7 @@ func scanHandler(w http.ResponseWriter, req *http.Request) {
 	ctx.ActivityChan <- 1
 	defer func() { ctx.ActivityChan <- -1 }()
 
-	if !ctx.ClamInterceptor.Handle(w, req, req.Body) {
+	if !ctx.ScanInterceptor.Handle(w, req, req.Body) {
 		w.Write([]byte("No virus found"))
 	}
 }
@@ -329,7 +328,7 @@ func scanForwardHandler(w http.ResponseWriter, req *http.Request) {
 	ctx.ActivityChan <- 1
 	defer func() { ctx.ActivityChan <- -1 }()
 
-	fw := forwarder.NewForwarder(ctx.ApplicationURL, ctx.Config.App.ContentMemoryThreshold, ctx.ClamInterceptor)
+	fw := forwarder.NewForwarder(ctx.ApplicationURL, ctx.Config.App.ContentMemoryThreshold, ctx.ScanInterceptor)
 	fw.SetLogger(ctx.Logger, ctx.Config.App.Debug)
 	fw.HandleRequest(w, req)
 }
@@ -347,9 +346,9 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	ctx.ActivityChan <- 1
 	defer func() { ctx.ActivityChan <- -1 }()
 
-	c := clamd.NewClamd(ctx.ClamInterceptor.ClamdURL)
+	c := clamd.NewClamd(ctx.Config.App.ClamdURL)
 	info := &Info{
-		ClamdURL: ctx.ClamInterceptor.ClamdURL,
+		ClamdURL: ctx.Config.App.ClamdURL,
 	}
 	if err := c.Ping(); err != nil {
 		// If we can't ping the Clamd server, no point in making the remaining requests
