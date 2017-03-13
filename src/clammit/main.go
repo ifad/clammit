@@ -23,8 +23,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-
-	clamd "github.com/dutchcoders/go-clamd"
 	"gopkg.in/gcfg.v1"
 )
 
@@ -104,6 +102,7 @@ type Ctx struct {
 	Config          Config
 	ApplicationURL  *url.URL
 	ScanInterceptor *ScanInterceptor
+	Scanner         Scanner
 	Logger          *log.Logger
 	Listener        net.Listener
 	ActivityChan    chan int
@@ -167,9 +166,12 @@ func main() {
 	 */
 	ctx.ApplicationURL = checkURL(ctx.Config.App.ApplicationURL)
 	checkURL(ctx.Config.App.ClamdURL)
+	ctx.Scanner = &ClamScanner{
+		ClamdURL: ctx.Config.App.ClamdURL,
+	}
 	ctx.ScanInterceptor = &ScanInterceptor{
 		VirusStatusCode: ctx.Config.App.VirusStatusCode,
-		Scanner:         ClamScanner{ClamdURL: ctx.Config.App.ClamdURL},
+		Scanner:         ctx.Scanner,
 	}
 
 	/*
@@ -346,16 +348,14 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	ctx.ActivityChan <- 1
 	defer func() { ctx.ActivityChan <- -1 }()
 
-	c := clamd.NewClamd(ctx.Config.App.ClamdURL)
 	info := &Info{
 		ClamdURL: ctx.Config.App.ClamdURL,
 	}
-	if err := c.Ping(); err != nil {
-		// If we can't ping the Clamd server, no point in making the remaining requests
+	if err := ctx.Scanner.ping(); err != nil {
 		info.PingResult = err.Error()
 	} else {
 		info.PingResult = "Connected to server OK"
-		if response, err := c.Version(); err != nil {
+		if response, err := ctx.Scanner.version(); err != nil {
 			info.Version = err.Error()
 		} else {
 			for s := range response {
@@ -365,8 +365,8 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 		/*
 		 * Validate the Clamd response for a viral string
 		 */
-		reader := bytes.NewReader(clamd.EICAR)
-		if response, err := c.ScanStream(reader); err != nil {
+		reader := bytes.NewReader(EICAR)
+		if response, err := ctx.Scanner.scan(reader); err != nil {
 			info.TestScanVirusResult = err.Error()
 		} else {
 			for s := range response {
@@ -377,7 +377,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 		 * Validate the Clamd response for a non-viral string
 		 */
 		reader = bytes.NewReader([]byte("foo bar mcgrew"))
-		if response, err := c.ScanStream(reader); err != nil {
+		if response, err := ctx.Scanner.scan(reader); err != nil {
 			info.TestScanCleanResult = err.Error()
 		} else {
 			for s := range response {

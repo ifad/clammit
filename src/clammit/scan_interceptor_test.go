@@ -17,13 +17,25 @@ var mockVirusFound = false
 type MockScanner struct {
 }
 
-func (s MockScanner) scan(reader io.Reader) (bool, error) {
+func (s MockScanner) hasVirus(reader io.Reader) (bool, error) {
 	return mockVirusFound, nil
+}
+
+func (s MockScanner) scan(reader io.Reader) (chan string, error) {
+	return nil, nil
+}
+
+func (s MockScanner) ping() error {
+	return nil
+}
+
+func (s MockScanner) version() (chan string, error) {
+	return nil, nil
 }
 
 var scanInterceptor = ScanInterceptor{
 	VirusStatusCode: virusCode,
-	Scanner:         MockScanner{},
+	Scanner:         &MockScanner{},
 }
 
 var handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { scanInterceptor.Handle(w, req, req.Body) })

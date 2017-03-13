@@ -107,7 +107,7 @@ func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
  * returns True if a virus has been found and a http error response has been written
  */
 func (c *ScanInterceptor) respondOnVirus(w http.ResponseWriter, filename string, reader io.Reader) bool {
-	if hasVirus, err := c.Scanner.scan(reader); err != nil {
+	if hasVirus, err := c.Scanner.hasVirus(reader); err != nil {
 		ctx.Logger.Printf("Unable to scan file (%s): %v\n", filename, err)
 		http.Error(w, "Internal Server Error", 500)
 		return true
