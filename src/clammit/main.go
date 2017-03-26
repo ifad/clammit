@@ -9,9 +9,11 @@ package main
 import (
 	"bytes"
 	"clammit/forwarder"
+	"clammit/scanner"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"gopkg.in/gcfg.v1"
 	"io/ioutil"
 	"log"
 	"net"
@@ -23,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"gopkg.in/gcfg.v1"
 )
 
 //
@@ -102,7 +103,7 @@ type Ctx struct {
 	Config          Config
 	ApplicationURL  *url.URL
 	ScanInterceptor *ScanInterceptor
-	Scanner         Scanner
+	Scanner         scanner.Scanner
 	Logger          *log.Logger
 	Listener        net.Listener
 	ActivityChan    chan int
@@ -113,7 +114,7 @@ type Ctx struct {
 // JSON server information response
 //
 type Info struct {
-	ClamdURL            string `json:"clam_server_url"`
+	Address             string `json:"scan_server_url"`
 	PingResult          string `json:"ping_result"`
 	Version             string `json:"version"`
 	TestScanVirusResult string `json:"test_scan_virus"`
@@ -125,6 +126,7 @@ type Info struct {
 //
 var ctx *Ctx
 var configFile string
+var EICAR = []byte(`X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`)
 
 func init() {
 	flag.StringVar(&configFile, "config", "", "Configuration file")
@@ -166,9 +168,11 @@ func main() {
 	 */
 	ctx.ApplicationURL = checkURL(ctx.Config.App.ApplicationURL)
 	checkURL(ctx.Config.App.ClamdURL)
-	ctx.Scanner = &ClamScanner{
-		ClamdURL: ctx.Config.App.ClamdURL,
-	}
+
+	ctx.Scanner = new(scanner.Clamav)
+	ctx.Scanner.SetLogger(ctx.Logger, ctx.Config.App.Debug)
+	ctx.Scanner.SetAddress(ctx.Config.App.ClamdURL)
+
 	ctx.ScanInterceptor = &ScanInterceptor{
 		VirusStatusCode: ctx.Config.App.VirusStatusCode,
 		Scanner:         ctx.Scanner,
@@ -338,7 +342,7 @@ func scanForwardHandler(w http.ResponseWriter, req *http.Request) {
 /*
  * Handler for /info
  *
- * Validates the Clamd connection
+ * Validates the Scanner connection
  * Emits the information as a JSON response
  */
 func infoHandler(w http.ResponseWriter, req *http.Request) {
@@ -349,13 +353,13 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	defer func() { ctx.ActivityChan <- -1 }()
 
 	info := &Info{
-		ClamdURL: ctx.Config.App.ClamdURL,
+		Address: ctx.Scanner.Address(),
 	}
-	if err := ctx.Scanner.ping(); err != nil {
+	if err := ctx.Scanner.Ping(); err != nil {
 		info.PingResult = err.Error()
 	} else {
 		info.PingResult = "Connected to server OK"
-		if response, err := ctx.Scanner.version(); err != nil {
+		if response, err := ctx.Scanner.Version(); err != nil {
 			info.Version = err.Error()
 		} else {
 			for s := range response {
@@ -366,7 +370,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 		 * Validate the Clamd response for a viral string
 		 */
 		reader := bytes.NewReader(EICAR)
-		if response, err := ctx.Scanner.scan(reader); err != nil {
+		if response, err := ctx.Scanner.Scan(reader); err != nil {
 			info.TestScanVirusResult = err.Error()
 		} else {
 			for s := range response {
@@ -377,7 +381,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 		 * Validate the Clamd response for a non-viral string
 		 */
 		reader = bytes.NewReader([]byte("foo bar mcgrew"))
-		if response, err := ctx.Scanner.scan(reader); err != nil {
+		if response, err := ctx.Scanner.Scan(reader); err != nil {
 			info.TestScanCleanResult = err.Error()
 		} else {
 			for s := range response {

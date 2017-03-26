@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"clammit/scanner"
 	"io"
 	"log"
 	"net/http"
@@ -15,27 +16,16 @@ const virusCode = 418
 var mockVirusFound = false
 
 type MockScanner struct {
+	scanner.Engine
 }
 
-func (s MockScanner) hasVirus(reader io.Reader) (bool, error) {
+func (s MockScanner) HasVirus(reader io.Reader) (bool, error) {
 	return mockVirusFound, nil
-}
-
-func (s MockScanner) scan(reader io.Reader) (chan string, error) {
-	return nil, nil
-}
-
-func (s MockScanner) ping() error {
-	return nil
-}
-
-func (s MockScanner) version() (chan string, error) {
-	return nil, nil
 }
 
 var scanInterceptor = ScanInterceptor{
 	VirusStatusCode: virusCode,
-	Scanner:         &MockScanner{},
+	Scanner:         new(MockScanner),
 }
 
 var handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { scanInterceptor.Handle(w, req, req.Body) })
