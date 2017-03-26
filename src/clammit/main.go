@@ -26,6 +26,11 @@ import (
 	"syscall"
 )
 
+/* This is for Go Releaser.
+ * https://github.com/goreleaser/goreleaser#a-note-about-mainversion
+ */
+var version = "master"
+
 //
 // Configuration structure, designed for gcfg
 //
@@ -110,9 +115,10 @@ type Ctx struct {
 // JSON server information response
 //
 type Info struct {
+	Version             string `json:"clammit_version"`
 	Address             string `json:"scan_server_url"`
 	PingResult          string `json:"ping_result"`
-	Version             string `json:"version"`
+	ScannerVersion      string `json:"scan_server_version"`
 	TestScanVirusResult string `json:"test_scan_virus"`
 	TestScanCleanResult string `json:"test_scan_clean"`
 }
@@ -346,15 +352,16 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 
 	info := &Info{
 		Address: ctx.Scanner.Address(),
+		Version: version,
 	}
 	if err := ctx.Scanner.Ping(); err != nil {
 		info.PingResult = err.Error()
 	} else {
 		info.PingResult = "Connected to server OK"
 		if response, err := ctx.Scanner.Version(); err != nil {
-			info.Version = err.Error()
+			info.ScannerVersion = err.Error()
 		} else {
-			info.Version = response
+			info.ScannerVersion = response
 		}
 		/*
 		 * Validate the Clamd response for a viral string

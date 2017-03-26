@@ -1,0 +1,9 @@
+build:
+  main: clammit
+  binary_name: clammit
+  goos:
+    - linux
+  goarch:
+    - amd64
+    - arm
+    - arm64
