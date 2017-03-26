@@ -23,19 +23,42 @@ func (c *Clamav) SetAddress(url string) {
 }
 
 func (c *Clamav) HasVirus(reader io.Reader) (bool, error) {
-	response, err := c.Scan(reader)
+	result, err := c.Scan(reader)
 	if err != nil {
 		return false, err
 	}
 
-	result := false
-	for s := range response {
-		if s != "stream: OK" {
-			if c.debug {
-				c.logger.Printf("  %v", s)
-			}
-			result = true
-		}
+	return result.Virus, nil
+}
+
+func (c *Clamav) Scan(reader io.Reader) (*Result, error) {
+	if c.debug {
+		c.logger.Println("Sending to clamav")
+	}
+
+	ch, err := c.clam.ScanStream(reader, nil)
+	if err != nil {
+		return nil, err
+	}
+	var status string
+
+	r := (<-ch)
+
+	switch r.Status {
+	case clamd.RES_OK:
+		status = RES_CLEAN
+	case clamd.RES_FOUND:
+		status = RES_FOUND
+	case clamd.RES_ERROR:
+	case clamd.RES_PARSE_ERROR:
+	default:
+		status = RES_ERROR
+	}
+
+	result := &Result{
+		Status:      status,
+		Virus:       status == RES_FOUND,
+		Description: r.Description,
 	}
 
 	if c.debug {
@@ -45,18 +68,16 @@ func (c *Clamav) HasVirus(reader io.Reader) (bool, error) {
 	return result, nil
 }
 
-func (c *Clamav) Scan(reader io.Reader) (chan string, error) {
-	if c.debug {
-		c.logger.Println("Sending to clamav")
-	}
-
-	return c.clam.ScanStream(reader)
-}
-
 func (c *Clamav) Ping() error {
 	return c.clam.Ping()
 }
 
-func (c *Clamav) Version() (chan string, error) {
-	return c.clam.Version()
+func (c *Clamav) Version() (string, error) {
+	ch, err := c.clam.Version()
+	if err != nil {
+		return "", err
+	}
+
+	r := (<-ch)
+	return r.Raw, nil
 }

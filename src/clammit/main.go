@@ -362,31 +362,25 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 		if response, err := ctx.Scanner.Version(); err != nil {
 			info.Version = err.Error()
 		} else {
-			for s := range response {
-				info.Version += s
-			}
+			info.Version = response
 		}
 		/*
 		 * Validate the Clamd response for a viral string
 		 */
 		reader := bytes.NewReader(EICAR)
-		if response, err := ctx.Scanner.Scan(reader); err != nil {
+		if result, err := ctx.Scanner.Scan(reader); err != nil {
 			info.TestScanVirusResult = err.Error()
 		} else {
-			for s := range response {
-				info.TestScanVirusResult += s
-			}
+			info.TestScanVirusResult = result.String()
 		}
 		/*
 		 * Validate the Clamd response for a non-viral string
 		 */
 		reader = bytes.NewReader([]byte("foo bar mcgrew"))
-		if response, err := ctx.Scanner.Scan(reader); err != nil {
+		if result, err := ctx.Scanner.Scan(reader); err != nil {
 			info.TestScanCleanResult = err.Error()
 		} else {
-			for s := range response {
-				info.TestScanCleanResult += s
-			}
+			info.TestScanCleanResult = result.String()
 		}
 	}
 	// Aaaand return
