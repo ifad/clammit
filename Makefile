@@ -17,10 +17,14 @@ cleanimports:
 application:
 	cd src/clammit && go install
 
-gets:	gcfg testify
+
+gets:	gcfg testify go-clamd
 
 gcfg:
 	[ -d src/gopkg.in/gcfg.v1 ] || go get gopkg.in/gcfg.v1
+
+go-clamd:
+	[ -d src/github.com/Freeaqingme/go-clamd ] || go get github.com/Freeaqingme/go-clamd
 
 testify:
 	[ -d src/gopkg.in/testify.v1 ] || go get gopkg.in/stretchr/testify.v1

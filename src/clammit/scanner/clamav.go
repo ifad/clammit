@@ -1,7 +1,7 @@
 package scanner
 
 import (
-	clamd "github.com/dutchcoders/go-clamd"
+	clamd "github.com/Freeaqingme/go-clamd"
 	"io"
 )
 
