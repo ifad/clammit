@@ -7,31 +7,30 @@
 package main
 
 import (
+	"clammit/scanner"
 	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
-
-	clamd "github.com/dutchcoders/go-clamd"
 )
 
 //
-// The implementation of the ClamAV interceptor
+// The implementation of the Scan interceptor
 //
-type ClamInterceptor struct {
-	ClamdURL        string
+type ScanInterceptor struct {
 	VirusStatusCode int
+	Scanner         scanner.Scanner
 }
 
 /*
- * Interceptor implementation for Clamd
+ * Interceptor implementation
  *
- * Runs a multi-part parser across the request body and sends all file contents to Clamd
+ * Runs a multi-part parser across the request body and sends all file contents to Scanner
  *
  * returns True if the body contains a virus
  */
-func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body io.Reader) bool {
+func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body io.Reader) bool {
 	//
 	// Don't care unless it's a post
 	//
@@ -108,8 +107,8 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
  *
  * returns True if a virus has been found and a http error response has been written
  */
-func (c *ClamInterceptor) respondOnVirus(w http.ResponseWriter, filename string, reader io.Reader) bool {
-	if hasVirus, err := c.scan(reader); err != nil {
+func (c *ScanInterceptor) respondOnVirus(w http.ResponseWriter, filename string, reader io.Reader) bool {
+	if hasVirus, err := c.Scanner.HasVirus(reader); err != nil {
 		ctx.Logger.Printf("Unable to scan file (%s): %v\n", filename, err)
 		http.Error(w, "Internal Server Error", 500)
 		return true
@@ -119,37 +118,4 @@ func (c *ClamInterceptor) respondOnVirus(w http.ResponseWriter, filename string,
 		return true
 	}
 	return false
-}
-
-/*
- * This function performs the actual virus scan
- */
-func (c *ClamInterceptor) scan(reader io.Reader) (bool, error) {
-
-	clam := clamd.NewClamd(c.ClamdURL)
-
-	if ctx.Config.App.Debug {
-		ctx.Logger.Println("Sending to clamav")
-	}
-
-	response, err := clam.ScanStream(reader)
-	if err != nil {
-		return false, err
-	}
-
-	hasVirus := false
-	for s := range response {
-		if s != "stream: OK" {
-			if ctx.Config.App.Debug {
-				ctx.Logger.Printf("  %v", s)
-			}
-			hasVirus = true
-		}
-	}
-
-	if ctx.Config.App.Debug {
-		ctx.Logger.Println("  result of scan:", hasVirus)
-	}
-
-	return hasVirus, nil
 }
