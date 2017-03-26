@@ -5,6 +5,7 @@ import (
 	"clammit/scanner"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -78,6 +79,73 @@ func TestNonMultipartRequest_Clean(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, 200)
 	}
+}
+
+func TestMultipartRequest_VirusFound(t *testing.T) {
+	setup()
+	mockVirusFound = true
+
+	body, contentType := makeMultipartBody()
+
+	req := newHTTPRequest("POST", contentType, body)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != virusCode {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, virusCode)
+	}
+	expected := `File foo.dat has a virus!`
+	if rr.Body.String() != expected {
+		t.Errorf("handler returned unexpected body: got %v want %v",
+			rr.Body.String(), expected)
+	}
+}
+
+func TestMultipartRequest_Clean(t *testing.T) {
+	setup()
+	mockVirusFound = false
+
+	body, contentType := makeMultipartBody()
+
+	req := newHTTPRequest("POST", contentType, body)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != 200 {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, virusCode)
+	}
+}
+
+func makeMultipartBody() (*bytes.Buffer, string) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	defer writer.Close()
+
+	addPart(writer, "file1", "foo.dat")
+	addPart(writer, "file2", "bar.dat")
+
+	err := writer.Close()
+	if err != nil {
+		log.Fatal("Can't close multipart writer: %v", err)
+	}
+
+	return body, writer.FormDataContentType()
+}
+
+func addPart(w *multipart.Writer, name, fileName string) {
+	part, err := w.CreateFormFile(name, fileName)
+	if err != nil {
+		log.Fatal("Cannot create multipart body: %v", err)
+	}
+
+	_, err = io.WriteString(part, name)
+	if err != nil {
+		log.Fatal("Can't write part to multipart body: %v", err)
+	}
+	return
 }
 
 func setup() {
