@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -39,7 +40,7 @@ type Scanner interface {
 	 * This function performs the actual virus scan and returns an engine-specific
 	 * response string
 	 */
-	Scan(reader io.Reader) (chan string, error)
+	Scan(reader io.Reader) (*Result, error)
 
 	/*
 	 * Tests the liveliness of the underlying scan engine
@@ -49,7 +50,7 @@ type Scanner interface {
 	/*
 	 * Returns the version of the underlying scan engine
 	 */
-	Version() (chan string, error)
+	Version() (string, error)
 }
 
 /*
@@ -88,4 +89,36 @@ func (e *Engine) SetLogger(logger *log.Logger, debug bool) {
 	}
 	e.logger = logger
 	e.debug = debug
+}
+
+/*
+ * Scanner result statuses
+ */
+const (
+	RES_CLEAN = "CLEAN"
+	RES_FOUND = "FOUND"
+	RES_ERROR = "ERROR"
+)
+
+/*
+ * Embeds a scan result.
+ *
+ * Status is one of the RES_* constants
+ * Virus is true or false depending a Virus has been detected
+ * Description is an extended status, containing the virus name
+ */
+type Result struct {
+	Status      string
+	Virus       bool
+	Description string
+}
+
+func (r *Result) String() string {
+	ret := fmt.Sprintf("Status: %s; Virus: %v", r.Status, r.Virus)
+
+	if r.Virus {
+		ret += fmt.Sprintf("; Description: %s", r.Description)
+	}
+
+	return ret
 }

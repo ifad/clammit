@@ -14,7 +14,6 @@ import (
 	"flag"
 	"fmt"
 	"gopkg.in/gcfg.v1"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -78,8 +77,6 @@ type ApplicationConfig struct {
 	TestPages bool `gcfg:"test-pages"`
 	// If true, will log the progression of each request through the forwarder
 	Debug bool `gcfg:"debug"`
-	// If true, will log the annoying clamd messages
-	DebugClam bool `gcfg:"debug-clam"`
 	// Number of CPU threads to use
 	NumThreads int `gcfg:"num-threads"`
 }
@@ -97,7 +94,6 @@ var DefaultApplicationConfig = ApplicationConfig{
 	Logfile:                "",
 	TestPages:              true,
 	Debug:                  false,
-	DebugClam:              false,
 	NumThreads:             runtime.NumCPU(),
 }
 
@@ -196,10 +192,6 @@ func main() {
 		router.Handle("/clammit/test/", http.StripPrefix("/clammit/test/", fs))
 	}
 	router.HandleFunc("/", scanForwardHandler)
-
-	if !ctx.Config.App.DebugClam {
-		log.SetOutput(ioutil.Discard) // go-clamd has irritating logging, so turn it off
-	}
 
 	if listener, err := getListener(ctx.Config.App.Listen, socketPerms); err != nil {
 		ctx.Logger.Fatal("Unable to listen on: ", ctx.Config.App.Listen, ", reason: ", err)
@@ -369,31 +361,25 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 		if response, err := ctx.Scanner.Version(); err != nil {
 			info.ScannerVersion = err.Error()
 		} else {
-			for s := range response {
-				info.ScannerVersion += s
-			}
+			info.ScannerVersion = response
 		}
 		/*
 		 * Validate the Clamd response for a viral string
 		 */
 		reader := bytes.NewReader(EICAR)
-		if response, err := ctx.Scanner.Scan(reader); err != nil {
+		if result, err := ctx.Scanner.Scan(reader); err != nil {
 			info.TestScanVirusResult = err.Error()
 		} else {
-			for s := range response {
-				info.TestScanVirusResult += s
-			}
+			info.TestScanVirusResult = result.String()
 		}
 		/*
 		 * Validate the Clamd response for a non-viral string
 		 */
 		reader = bytes.NewReader([]byte("foo bar mcgrew"))
-		if response, err := ctx.Scanner.Scan(reader); err != nil {
+		if result, err := ctx.Scanner.Scan(reader); err != nil {
 			info.TestScanCleanResult = err.Error()
 		} else {
-			for s := range response {
-				info.TestScanCleanResult += s
-			}
+			info.TestScanCleanResult = result.String()
 		}
 	}
 	// Aaaand return
