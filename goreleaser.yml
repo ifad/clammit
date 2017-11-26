@@ -1,6 +1,6 @@
 build:
   main: clammit
-  binary_name: clammit
+  binary: clammit
   goos:
     - linux
   goarch:
