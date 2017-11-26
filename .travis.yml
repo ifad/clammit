@@ -3,6 +3,9 @@ go:
 
 language: go
 
+env:
+  - DISABLE_IPV6=1
+
 install:
   - make
 
