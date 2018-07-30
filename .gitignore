@@ -4,6 +4,7 @@ dist/*
 pkg/*
 src/gopkg.in/*
 src/github.com/*
+src/code.google.com/*
 log
 log/*
 etc
