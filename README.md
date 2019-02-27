@@ -110,9 +110,9 @@ Flow-wise, Clammit is straightforward. It sets up an HTTP server to accept
 incoming requests (main.go):
 
 1. Each request is passed to the forwarder (forwarder/forwarder.go)
-2. The forwarder dowloads the request body (as it will be used at least twice)
+2. The forwarder downloads the request body (as it will be used at least twice)
 3. The forwarder passes the request to the clam interceptor (clam\_interceptor.go)
-4. The only request that will be tested will have methods POST/PUT/PATCH and content-type "multipart/form-data"
+4. The only request that will be tested will have methods POST/PUT/PATCH
 5. The clam interceptor locates and sends each form-data field to ClamD
 6. For any positive response, the interceptor will write an HTTP response and return (and the forwarder will not attempt to forward the request)
 7. If the interceptor OKs the request, the forwarder constructs a new HTTP request and forwards to the application
@@ -170,9 +170,8 @@ This method will return JSON giving the current status of Clammit and its connec
   POST /clammit/scan
 ```
 
-This is the endpoint to submit files for scanning only. The request must have content-type ```multipart/form-data```
-and any files to be scanned should be attached as file objects. Clammit will return an HTTP status code of 200 if
-the request is clean and 418 if there is a bad attachment.
+This is the endpoint to submit files for scanning only. Any files to be scanned should be attached as file objects. 
+Clammit will return an HTTP status code of 200 if the request is clean and 418 if there is a bad attachment.
 
 ### Test
 
@@ -181,7 +180,7 @@ the request is clean and 418 if there is a bad attachment.
 ```
 
 This will return a simple file upload page, to test sending requests to Clammit. These pages are located in the
-testing/ subdirectory.
+testing/ sub-directory.
 
 ## Resources
 
@@ -197,7 +196,7 @@ Run ```make test```
 * It does not attempt to recursively scan fields - e.g. attachments in an email chain
 * It does not try to be particularly clever with storing the body, which means that a DOS attack by hitting it simultaneously with a gazillion small files is quite possible.
 
-## Licence
+## License
 
 [MIT](https://github.com/ifad/clammit/blob/master/LICENSE)
 

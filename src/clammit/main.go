@@ -1,8 +1,7 @@
 /*
- * The Clammit application intercepts HTTP POST requests with content-type
- * "multipart/form-data", forwards any "file" form-data elements to ClamAV
- * and only forwards the request to the application if ClamAV passes all
- * of these elements as virus-free.
+ * The Clammit application intercepts HTTP POST/PATCH/PUT requests, forwards any
+ * "file" form-data elements to ClamAV and only forwards the request to the
+ * application if ClamAV passes all of these elements as virus-free.
  */
 package main
 
