@@ -231,6 +231,10 @@ func (f *Forwarder) getClient(req *http.Request) (*http.Client, *url.URL) {
 		}, url
 	} else {
 		f.logger.Printf("Forwarding to %s", applicationURL.String())
-		return &http.Client{}, url
+		return &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}, url
 	}
 }
