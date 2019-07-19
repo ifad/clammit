@@ -165,6 +165,7 @@ func (f *Forwarder) forwardRequest(req *http.Request, body io.Reader, contentLen
 	client, url := f.getClient(req)
 	freq, _ := http.NewRequest(req.Method, url.String(), body)
 	freq.ContentLength = contentLength
+	freq.Host = req.Host
 	for key, val := range req.Header {
 		freq.Header[key] = val
 	}
