@@ -132,6 +132,54 @@ func TestForwarding(t *testing.T) {
 	}
 }
 
+func TestHostForwarding(t *testing.T) {
+	requestText := "This is a request"
+	responseText := "This is the response"
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hostname := strings.Split(r.Host, ":")[0]
+		if hostname != "localhost" {
+			t.Fatalf("Host field incorrect: %v, expected %v", hostname, "localhost")
+		}
+		defer r.Body.Close()
+		w.WriteHeader(202)
+		w.Write([]byte(responseText))
+	}))
+	defer ts.Close()
+	tsURL, _ := url.Parse(ts.URL)
+
+	fw := NewForwarder(tsURL, 10000, nil)
+
+	req, _ := http.NewRequest("POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText))
+	req.Header.Set("myheader", "headervalue")
+	req.RemoteAddr = "foobar:1234"
+	w := NewTestResponseWriter()
+
+	fw.HandleRequest(w, req)
+
+	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hostname := strings.Split(r.Host, ":")[0]
+		if hostname != "testhost" {
+			t.Fatalf("Host field incorrect: %v, expected %v", hostname, "testhost")
+		}
+		defer r.Body.Close()
+		w.WriteHeader(202)
+		w.Write([]byte(responseText))
+	}))
+	defer ts.Close()
+	tsURL, _ = url.Parse(ts.URL)
+
+	fw = NewForwarder(tsURL, 10000, nil)
+
+	req, _ = http.NewRequest("POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText))
+	req.Host = "testhost"
+	req.Header.Set("myheader", "headervalue")
+	req.RemoteAddr = "foobar:1234"
+	w = NewTestResponseWriter()
+
+	fw.HandleRequest(w, req)
+}
+
 func TestMutliForwarder(t *testing.T) {
 	requestText := "This is a request"
 
