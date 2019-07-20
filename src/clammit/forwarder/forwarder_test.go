@@ -55,7 +55,7 @@ func TestInterceptor(t *testing.T) {
 		if n, err := body.Read(buf); err != nil && err != io.EOF {
 			t.Fatalf("Got error reading body: %s", err.Error())
 		} else if string(buf[0:n]) != bodyText {
-			t.Fatalf("Read body failed: X%vX, expected X%vX %v", string(buf[0:n]), bodyText)
+			t.Fatalf("Read body failed: X%vX, expected X%vX", string(buf[0:n]), bodyText)
 		}
 		w.Header().Set("foo", "bar")
 		w.WriteHeader(204)
@@ -103,7 +103,7 @@ func TestForwarding(t *testing.T) {
 		if body, err := ioutil.ReadAll(r.Body); err != nil {
 			t.Fatal("Unexpected error reading request body:", err)
 		} else if string(body) != requestText {
-			t.Fatal("Request body is %s, expected %s", string(body), requestText)
+			t.Fatalf("Request body is %s, expected %s", string(body), requestText)
 		}
 		w.Header().Add("foo", "bar")
 		w.WriteHeader(202)
