@@ -1,0 +1,11 @@
+
+
+CLAMMIT:
+
+ - the ClamInterceptor class should be in its own source file
+ - main.go:378, broken_err can be overridden if more than one
+   file in the request errs out
+ - document program architecture (interceptor, forwarder, etc)
+ - not really like passing the http response around, because
+   this way http response codes are scattered around the code
+

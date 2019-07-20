@@ -176,7 +176,7 @@ func (f *Forwarder) forwardRequest(req *http.Request, body io.Reader, contentLen
 		if xff != "" {
 			xff += ", "
 		}
-		xff += req.Header.Get("X-Forwarded-For") + strings.Split(req.RemoteAddr, ":")[0]
+		xff += strings.Split(req.RemoteAddr, ":")[0]
 		freq.Header.Set("X-Forwarded-For", xff)
 	}
 
