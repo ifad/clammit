@@ -155,7 +155,7 @@ func main() {
 		if sp, err := strconv.ParseInt(ctx.Config.App.SocketPerms, 8, 0); err == nil {
 			socketPerms = int(sp)
 		} else {
-			log.Fatalf("SocketPerms invalid (expected 4-digit octal: %s", err.Error)
+			log.Fatalf("SocketPerms invalid (expected 4-digit octal: %s", err.Error())
 		}
 	}
 

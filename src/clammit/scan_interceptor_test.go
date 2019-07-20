@@ -129,7 +129,7 @@ func makeMultipartBody() (*bytes.Buffer, string) {
 
 	err := writer.Close()
 	if err != nil {
-		log.Fatal("Can't close multipart writer: %v", err)
+		log.Fatal("Can't close multipart writer:", err)
 	}
 
 	return body, writer.FormDataContentType()
@@ -138,12 +138,12 @@ func makeMultipartBody() (*bytes.Buffer, string) {
 func addPart(w *multipart.Writer, name, fileName string) {
 	part, err := w.CreateFormFile(name, fileName)
 	if err != nil {
-		log.Fatal("Cannot create multipart body: %v", err)
+		log.Fatal("Cannot create multipart body:", err)
 	}
 
 	_, err = io.WriteString(part, name)
 	if err != nil {
-		log.Fatal("Can't write part to multipart body: %v", err)
+		log.Fatal("Can't write part to multipart body:", err)
 	}
 	return
 }

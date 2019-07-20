@@ -97,7 +97,7 @@ func (f *Forwarder) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	//
 	bodyHolder, err := NewBodyHolder(req.Body, req.ContentLength, f.contentMemoryThreshold)
 	if err != nil {
-		f.logger.Println("Unable to save body to local store: %s", err.Error())
+		f.logger.Println("Unable to save body to local store:", err.Error())
 		http.Error(w, "Internal Server Error", 500)
 		return
 	}
@@ -165,6 +165,7 @@ func (f *Forwarder) forwardRequest(req *http.Request, body io.Reader, contentLen
 	client, url := f.getClient(req)
 	freq, _ := http.NewRequest(req.Method, url.String(), body)
 	freq.ContentLength = contentLength
+	freq.Host = req.Host
 	for key, val := range req.Header {
 		freq.Header[key] = val
 	}

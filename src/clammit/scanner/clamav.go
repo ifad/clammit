@@ -18,7 +18,7 @@ func (c *Clamav) SetAddress(url string) {
 	c.clam = clamd.NewClamd(url)
 
 	if c.debug {
-		c.logger.Println("Initialised clamav connection to %s", url)
+		c.logger.Println("Initialised clamav connection to", url)
 	}
 }
 
