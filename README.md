@@ -75,13 +75,15 @@ The configuration is pretty simple:
 
 ```ini
 [ application ]
-listen            = :8438
-application-url   = http://host:port/path
-clamd-url         = http://host:port/
-virus-status-code = 418
-log-file          = /var/log/clammit.log
-debug             = true
-test-pages        = true
+listen                      = :8438
+application-url             = http://host:port/path
+clamd-url                   = http://host:port/
+virus-status-code           = 418
+virus-response-body         = "{ \"error\": \"File Contains Virus\"}"
+virus-response-content-type = "application/json"
+log-file                    = /var/log/clammit.log
+debug                       = true
+test-pages                  = true
 ```
 
 Setting           | Description
@@ -90,6 +92,8 @@ listen            | The listen address (see below)
 clamd-url         | The URL of the clamd server
 application-url   | (Optional) Forward all requests to this application
 virus-status-code | (Optional) The HTTP status code to return when a virus is found
+virus-response-body | (Optional) The HTTP body to return when a virus is found
+virus-response-content-type | (Optional) The Content-Type header to return when a virus is found
 log-file          | (Optional) The clammit log file, if ommitted will log to stdout
 test-pages        | (Optional) If true, clammit will also offer up a page to perform test uploads
 debug             | (Optional) If true, more things will be logged

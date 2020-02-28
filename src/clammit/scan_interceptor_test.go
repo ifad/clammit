@@ -14,7 +14,7 @@ import (
 
 const virusCode = 418
 const badRequestCode = 400
-const customResponseBody = "{ error: 'File Contains Virus'}"
+const customResponseBody = "{ \"error\": \"File Contains Virus\"}"
 const customResponseContentType = "application/json"
 
 var mockVirusFound = false
