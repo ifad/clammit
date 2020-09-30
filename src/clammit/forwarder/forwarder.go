@@ -180,6 +180,9 @@ func (f *Forwarder) forwardRequest(req *http.Request, body io.Reader, contentLen
 		freq.Header.Set("X-Forwarded-For", xff)
 	}
 
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
 	return client.Do(freq)
 }
 
