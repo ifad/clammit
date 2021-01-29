@@ -170,7 +170,7 @@ This method will return JSON giving the current status of Clammit and its connec
   POST /clammit/scan
 ```
 
-This is the endpoint to submit files for scanning only. Any files to be scanned should be attached as file objects. 
+This is the endpoint to submit files for scanning only. Any files to be scanned should be attached as file objects.
 Clammit will return an HTTP status code of 200 if the request is clean and 418 if there is a bad attachment.
 
 ### Test
@@ -182,9 +182,9 @@ Clammit will return an HTTP status code of 200 if the request is clean and 418 i
 This will return a simple file upload page, to test sending requests to Clammit. These pages are located in the
 testing/ sub-directory.
 
-## Resources
+## Web app
 
-In the resources/ directory is a simple Sinatra server to act as the application (for testing purposes).
+In the web/ directory is a simple Sinatra server to act as the application (for testing purposes).
 
 ## Tests
 

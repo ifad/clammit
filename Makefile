@@ -1,34 +1,31 @@
-export GOPATH=$(PWD)
-
 all:	gets application
 
 linux:
 	GOOS=linux GOARCH=amd64 make application
 
 test: gets
-	cd src/clammit && go test clammit/...
+	go test ./...
 
 delve:
 	go get github.com/go-delve/delve/cmd/dlv
 
 debug: delve
-	cd src/clammit && $(GOPATH)/bin/dlv debug clammit
+	go run github.com/go-delve/delve/cmd/dlv debug .
 
 debug-test: delve
-	cd src/clammit && $(GOPATH)/bin/dlv test clammit
+	go run github.com/go-delve/delve/cmd/dlv test ./...
 
 fmt:
-	go fmt clammit/...
+	go fmt ./...
 
 clean:
-	rm bin/clammit
-	rm -rf pkg/*
+	rm -rf dist/
 
 application:
-	cd src/clammit && go install
+	go install
 
 gets:
-	cd src/clammit && go get
+	go get
 
 release:
-	curl -sL https://git.io/goreleaser | bash
+	goreleaser release
