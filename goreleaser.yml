@@ -1,9 +1,0 @@
-build:
-  main: clammit
-  binary: clammit
-  goos:
-    - linux
-  goarch:
-    - amd64
-    - arm
-    - arm64
