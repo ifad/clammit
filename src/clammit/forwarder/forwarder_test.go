@@ -2,20 +2,28 @@ package forwarder
 
 import (
 	"bytes"
-	"gopkg.in/stretchr/testify.v1/assert"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"gopkg.in/stretchr/testify.v1/assert"
 )
 
 type testResponseWriter struct {
 	Headers    http.Header
 	StatusCode int
 	Body       *bytes.Buffer
+}
+
+func emptyBody() io.Reader {
+	return bytes.NewReader([]byte{})
 }
 
 func NewTestResponseWriter() *testResponseWriter {
@@ -180,7 +188,7 @@ func TestHostForwarding(t *testing.T) {
 	fw.HandleRequest(w, req)
 }
 
-func TestMutliForwarder(t *testing.T) {
+func TestMultiForwarder(t *testing.T) {
 	requestText := "This is a request"
 
 	fw := NewForwarder(nil, 10000, nil)
@@ -233,4 +241,49 @@ func TestMutliForwarder(t *testing.T) {
 
 	assert.Equal(t, w3.StatusCode, 500)
 	assert.Equal(t, w3.Body.String(), "Internal Server Error\n")
+}
+
+func TestForwardingWithRedirectPOST(t *testing.T) {
+	requestText := "This is a request"
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Add("Location", "https://localhost:12345/foobar")
+		w.WriteHeader(302)
+	}))
+	defer ts.Close()
+	tsURL, _ := url.Parse(ts.URL)
+
+	fw := NewForwarder(tsURL, 10000, nil)
+
+	req, _ := http.NewRequest("POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText))
+	w := NewTestResponseWriter()
+
+	fw.HandleRequest(w, req)
+
+	require.Equal(t, 302, w.StatusCode)
+	assert.Equal(t, "https://localhost:12345/foobar", w.Header().Get("Location"))
+}
+
+func TestForwardingWithRedirectGET(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Add("Location", "https://localhost:12345/foobar")
+		w.WriteHeader(302)
+	}))
+	defer ts.Close()
+	tsURL, _ := url.Parse(ts.URL)
+
+	fw := NewForwarder(tsURL, 10000, nil)
+	fw.SetLogger(log.New(os.Stdout, "", log.Lshortfile), true)
+	req, _ := http.NewRequest("GET", "http://localhost:99999/bar?crazy=true", emptyBody())
+	req.Header.Set("X-Clammit-Backend", tsURL.String())
+
+	w := NewTestResponseWriter()
+
+	fw.HandleRequest(w, req)
+
+	require.Equal(t, 302, w.StatusCode)
+	assert.Equal(t, "https://localhost:12345/foobar", w.Header().Get("Location"))
 }
