@@ -13,6 +13,9 @@ import (
 )
 
 const virusCode = 418
+const badRequestCode = 400
+const customResponseBody = "{ \"error\": \"File Contains Virus\"}"
+const customResponseContentType = "application/json"
 
 var mockVirusFound = false
 
@@ -29,7 +32,17 @@ var scanInterceptor = ScanInterceptor{
 	Scanner:         new(MockScanner),
 }
 
+var scanInterceptorWithCustomResponse = ScanInterceptor{
+	VirusStatusCode:          badRequestCode,
+	VirusResponseBody:        customResponseBody,
+	VirusResponseContentType: customResponseContentType,
+	Scanner:                  new(MockScanner),
+}
+
 var handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { scanInterceptor.Handle(w, req, req.Body) })
+var handlerWithResponseBody = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	scanInterceptorWithCustomResponse.Handle(w, req, req.Body)
+})
 
 func TestNonMultipartRequest_VirusFound_Without_ContentDisposition(t *testing.T) {
 	setup()
@@ -46,6 +59,29 @@ func TestNonMultipartRequest_VirusFound_Without_ContentDisposition(t *testing.T)
 	if rr.Body.String() != expected {
 		t.Errorf("handler returned unexpected body: got %v want %v",
 			rr.Body.String(), expected)
+	}
+}
+
+func TestNonMultipartRequest_VirusFound_With_CustomResponseFields(t *testing.T) {
+	setup()
+	mockVirusFound = true
+	req := newHTTPRequest("POST", "application/octet-stream", bytes.NewReader([]byte(`<virus/>`)))
+	rr := httptest.NewRecorder()
+	handlerWithResponseBody.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != badRequestCode {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, badRequestCode)
+	}
+
+	if body := rr.Body.String(); body != customResponseBody {
+		t.Errorf("handler returned unexpected body: got %v want %v",
+			body, customResponseBody)
+	}
+
+	if ctype := rr.Header().Get("Content-Type"); ctype != customResponseContentType {
+		t.Errorf("handler returned unexpected body: got %v want %v",
+			ctype, customResponseContentType)
 	}
 }
 

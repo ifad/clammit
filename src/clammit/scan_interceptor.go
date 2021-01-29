@@ -19,8 +19,10 @@ import (
 // The implementation of the Scan interceptor
 //
 type ScanInterceptor struct {
-	VirusStatusCode int
-	Scanner         scanner.Scanner
+	VirusStatusCode          int
+	VirusResponseBody        string
+	VirusResponseContentType string
+	Scanner                  scanner.Scanner
 }
 
 /*
@@ -113,8 +115,14 @@ func (c *ScanInterceptor) respondOnVirus(w http.ResponseWriter, filename string,
 		http.Error(w, "Internal Server Error", 500)
 		return true
 	} else if hasVirus {
+		w.Header().Set("Content-Type", c.VirusResponseContentType)
 		w.WriteHeader(c.VirusStatusCode)
-		w.Write([]byte(fmt.Sprintf("File %s has a virus!", filename)))
+
+		if len(c.VirusResponseBody) > 0 {
+			w.Write([]byte(c.VirusResponseBody))
+		} else {
+			w.Write([]byte(fmt.Sprintf("File %s has a virus!", filename)))
+		}
 		return true
 	}
 	return false

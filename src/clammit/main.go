@@ -67,6 +67,9 @@ type ApplicationConfig struct {
 	ClamdURL string `gcfg:"clamd-url"`
 	// The HTTP status code to return when a virus is found
 	VirusStatusCode int `gcfg:"virus-status-code"`
+	// The HTTP status code to return when a virus is found
+	VirusResponseBody        string `gcfg:"virus-response-body"`
+	VirusResponseContentType string `gcfg:"virus-response-content-type"`
 	// If the body content-length exceeds this value, it will be written to
 	// disk. Below it, we'll hold the whole body in memory to improve speed.
 	ContentMemoryThreshold int64 `gcfg:"content-memory-threshold"`
@@ -84,16 +87,18 @@ type ApplicationConfig struct {
 // Default configuration
 //
 var DefaultApplicationConfig = ApplicationConfig{
-	Listen:                 ":8438",
-	SocketPerms:            "0777",
-	ApplicationURL:         "",
-	ClamdURL:               "",
-	VirusStatusCode:        418,
-	ContentMemoryThreshold: 1024 * 1024,
-	Logfile:                "",
-	TestPages:              true,
-	Debug:                  false,
-	NumThreads:             runtime.NumCPU(),
+	Listen:                   ":8438",
+	SocketPerms:              "0777",
+	ApplicationURL:           "",
+	ClamdURL:                 "",
+	VirusStatusCode:          418,
+	ContentMemoryThreshold:   1024 * 1024,
+	VirusResponseBody:        "",
+	VirusResponseContentType: "text/plain; charset=utf-8",
+	Logfile:                  "",
+	TestPages:                true,
+	Debug:                    false,
+	NumThreads:               runtime.NumCPU(),
 }
 
 //
@@ -175,8 +180,10 @@ func main() {
 	ctx.Scanner.SetAddress(ctx.Config.App.ClamdURL)
 
 	ctx.ScanInterceptor = &ScanInterceptor{
-		VirusStatusCode: ctx.Config.App.VirusStatusCode,
-		Scanner:         ctx.Scanner,
+		VirusStatusCode:          ctx.Config.App.VirusStatusCode,
+		VirusResponseBody:        ctx.Config.App.VirusResponseBody,
+		VirusResponseContentType: ctx.Config.App.VirusResponseContentType,
+		Scanner:                  ctx.Scanner,
 	}
 
 	/*
