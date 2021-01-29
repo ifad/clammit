@@ -2,6 +2,9 @@ export GOPATH=$(PWD)
 
 all:	gets application
 
+linux:
+	GOOS=linux GOARCH=amd64 make application
+
 test: gets
 	cd src/clammit && go test clammit/...
 
