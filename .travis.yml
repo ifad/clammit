@@ -1,5 +1,5 @@
 go:
-  - 1.8
+  - 1.15
 
 language: go
 
@@ -12,5 +12,5 @@ install:
 script:
   - make test
 
-after_success:
-  test -n "$TRAVIS_TAG" && make release
+#after_success:
+#  test -n "$TRAVIS_TAG" && make release
