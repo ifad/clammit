@@ -1,33 +1,34 @@
 export GOPATH=$(PWD)
-export GO15VENDOREXPERIMENT=1
 
 all:	gets application
 
+linux:
+	GOOS=linux GOARCH=amd64 make application
+
 test: gets
-	go test clammit/...
+	cd src/clammit && go test clammit/...
+
+delve:
+	go get github.com/go-delve/delve/cmd/dlv
+
+debug: delve
+	cd src/clammit && $(GOPATH)/bin/dlv debug clammit
+
+debug-test: delve
+	cd src/clammit && $(GOPATH)/bin/dlv test clammit
+
+fmt:
+	go fmt clammit/...
 
 clean:
 	rm bin/clammit
 	rm -rf pkg/*
 
-cleanimports:
-	rm -rf src/gopkg.in
-	rm -rf src/github.com
-
 application:
 	cd src/clammit && go install
 
-
-gets:	gcfg testify go-clamd
-
-gcfg:
-	[ -d src/gopkg.in/gcfg.v1 ] || go get gopkg.in/gcfg.v1
-
-go-clamd:
-	[ -d src/github.com/Freeaqingme/go-clamd ] || go get github.com/Freeaqingme/go-clamd
-
-testify:
-	[ -d src/gopkg.in/testify.v1 ] || go get gopkg.in/stretchr/testify.v1
+gets:
+	cd src/clammit && go get
 
 release:
 	curl -sL https://git.io/goreleaser | bash
