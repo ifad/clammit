@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
@@ -257,6 +255,7 @@ func TestForwardingWithRedirectPOST(t *testing.T) {
 	fw := NewForwarder(tsURL, 10000, nil)
 
 	req, _ := http.NewRequest("POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText))
+
 	w := NewTestResponseWriter()
 
 	fw.HandleRequest(w, req)
@@ -276,7 +275,7 @@ func TestForwardingWithRedirectGET(t *testing.T) {
 	tsURL, _ := url.Parse(ts.URL)
 
 	fw := NewForwarder(tsURL, 10000, nil)
-	fw.SetLogger(log.New(os.Stdout, "", log.Lshortfile), true)
+
 	req, _ := http.NewRequest("GET", "http://localhost:99999/bar?crazy=true", emptyBody())
 	req.Header.Set("X-Clammit-Backend", tsURL.String())
 
