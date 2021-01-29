@@ -17,44 +17,45 @@ Clammit is intended to be used as an internal proxy, a sort of middleware. It
 is best to only pass requests that include a file upload, however requests that
 aren't `POST`/`PUT`/`PATCH` are passed through directly without being scanned.
 
-As an example, say you have a Rails application that is configured in Nginx
+As an example, say you have a `foo` Rails application that is configured in Nginx
 like this:
 
 ```nginx
-set $my_app /myapp;
-
 server {
   listen 80;
-  server_name my_app.com;
+  server_name foobar.example.com;
 
-  root $my_app/public;
-  try_files $uri/index.html $uri @app;
+  root /home/foobar/public;
+  try_files $uri/index.html $uri @foobar;
 
-  location @app {
-    access_log /var/log/nginx/my_app-access.log;
+  location @foobar {
+    access_log /var/log/nginx/foobar.app-access.log;
+    error_log  /var/log/nginx/foobar.app-error.log
+
     proxy_set_header Host $http_host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_pass http://unix:$my_app/.unicorn.sock;
+    proxy_pass http://unix:/home/foobar/.unicorn.sock;
   }
-
-  error_page 500 502 503 504 /500.html;
-  client_max_body_size 4G;
-  keepalive_timeout 10;
 }
 ```
 
 Assuming you receive document uploads at `POST /documents`, to check them with
-Clammit add another location block like this:
+a Clammit that has been configured to listen on an UNIX socket in
+`/var/run/clammit.sock`, you should add a location block like this:
 
 ```nginx
-  set $clammit_app /clammit;
-
   location /documents {
-    access_log /var/log/nginx/my_app-access.log;
+    access_log /var/log/nginx/foobar.clammit-access.log;
+    error_log  /var/log/nginx/foobar.clammit-error.log;
+
     proxy_set_header Host $http_host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Clammit-Backend unix:$my_app/.unicorn.sock;
-    proxy_pass http://unix:$clammit_app/.unicorn.sock;
+
+    # This is where clammit will forward requests that do not contain viruses
+    # or that did not contain any data to scan.
+    proxy_set_header X-Clammit-Backend unix:/home/foobar/.unicorn.sock;
+
+    proxy_pass http://unix:/var/run/clammit.sock;
   }
 ```
 
@@ -95,8 +96,8 @@ debug-clam      | (Optional) If true, the response from ClamAV will be logged
 
 The listen address can be a TCP port or Unix socket, e.g.:
 
-* `0.0.0.0:8438`       - Listen on all IPs on port 8438
-* `unix:.clammit.sock` - Listen on a Unix socket
+* `0.0.0.0:8438`               - Listen on all IPs on port 8438
+* `unix:/var/run/clammit.sock` - Listen on a Unix socket
 
 The same format applies to the `clamd-url` and `application-url` parameters.
 
@@ -120,7 +121,7 @@ incoming requests (main.go):
 
 ## Building
 
-Clammit is requires the Go compiler, version 1.2 or above. It also requires ```make```
+Clammit is requires the Go compiler, version 1.15 or above. It also requires `make`
 to ease compilation. The makefile is pretty simple, though, so you can perform its
 steps manually if you want.
 
