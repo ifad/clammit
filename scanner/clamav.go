@@ -1,8 +1,9 @@
 package scanner
 
 import (
-	clamd "github.com/dutchcoders/go-clamd"
 	"io"
+
+	clamd "github.com/dutchcoders/go-clamd"
 )
 
 /*
@@ -36,7 +37,9 @@ func (c *Clamav) Scan(reader io.Reader) (*Result, error) {
 		c.logger.Println("Sending to clamav")
 	}
 
-	ch, err := c.clam.ScanStream(reader, nil)
+	abortChannel := make(chan bool)
+	defer close(abortChannel) // necessary to not leak a goroutine. See https://github.com/dutchcoders/go-clamd/issues/9
+	ch, err := c.clam.ScanStream(reader, abortChannel)
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +67,11 @@ func (c *Clamav) Scan(reader io.Reader) (*Result, error) {
 	if c.debug {
 		c.logger.Println("  result of scan:", result)
 	}
+
+	go func() {
+		for range ch {
+		} // empty the channel so the goroutine from go-clamd/*CLAMDConn.readResponse() doesn't get stuck
+	}()
 
 	return result, nil
 }
