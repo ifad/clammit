@@ -199,7 +199,7 @@ make test         | Runs the application unit tests
 
 1. Copy the compiled binary (bin/clammit), either into your project repository, or to an installation area.
 2. Edit the configuration file as appropriate.
-3. Configure your auto-start mechanism, be it God or init.d
+3. Configure your auto-start mechanism, be it God or init.d. An example systemd unig is provided.
 4. Configure the upstream webserver to forward appropriate POST requests to clammit.
 
 ## API

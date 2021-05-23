@@ -1,0 +1,33 @@
+[Unit]
+Description=Clammit - ClamAV HTTP filter
+After=network.target syslog.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+User=clammit
+Group=clammit
+Type=simple
+
+ExecStart=/usr/local/sbin/clammit -config=/etc/clammit.conf
+KillSignal=SIGTERM
+KillMode=control-group
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=clammit
+
+# Wait few secs when restarting after a failure
+RestartSec=2
+# Always-on
+Restart=always
+
+PrivateTmp=true
+PrivateDevices=true
+
+ProtectSystem=full
+
+ReadOnlyDirectories=/
+ReadWriteDirectories=/var/log/clammit
+ReadWriteDirectories=/var/run/clammit
