@@ -186,6 +186,8 @@ func main() {
 
 	router.HandleFunc("/clammit", infoHandler)
 	router.HandleFunc("/clammit/scan", scanHandler)
+	router.HandleFunc("/clammit/readyz", readyzHandler)
+
 	if ctx.Config.App.TestPages {
 		fs := http.FileServer(http.Dir("testfiles"))
 		router.Handle("/clammit/test/", http.StripPrefix("/clammit/test/", fs))
@@ -385,4 +387,18 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	s, _ := json.Marshal(info)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(s))
+}
+
+/*
+ * Handler for /clammit/readyz
+ *
+ * Returns 200 OK unless we are shutting down. Used in k8s.
+ * See https://github.com/ifad/clammit/issues/23
+ */
+func readyzHandler(w http.ResponseWriter, req *http.Request) {
+	if ctx.ShuttingDown {
+		w.WriteHeader(503)
+	} else {
+		w.WriteHeader(200)
+	}
 }
