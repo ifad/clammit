@@ -210,7 +210,7 @@ that these are not available externally.
 ### Info
 
 ```
-  GET /clammit/info
+  GET /clammit
 ```
 
 This method will return JSON giving the current status of Clammit and its connection to ClamAV.
@@ -223,6 +223,16 @@ This method will return JSON giving the current status of Clammit and its connec
 
 This is the endpoint to submit files for scanning only. Any files to be scanned should be attached as file objects.
 Clammit will return an HTTP status code of 200 if the request is clean and 418 if there is a bad attachment.
+
+### Ready
+
+```
+  GET /clammit/readyz
+```
+
+Returns 200 OK unless we are shutting down, waiting for currently running requests to complete.
+
+Clammit does not implement a liveness check, as clammit is available if its TCP socket is open.
 
 ### Test
 
