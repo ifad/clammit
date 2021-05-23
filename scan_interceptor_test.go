@@ -31,6 +31,18 @@ var scanInterceptor = ScanInterceptor{
 
 var handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { scanInterceptor.Handle(w, req, req.Body) })
 
+func TestNonMultipartRequest_EmptyBody(t *testing.T) {
+	setup()
+	req := newHTTPRequest("GET", "", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != 200 {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, 200)
+	}
+}
+
 func TestNonMultipartRequest_VirusFound_Without_ContentDisposition(t *testing.T) {
 	setup()
 	mockVirusFound = true
@@ -153,13 +165,16 @@ func setup() {
 		ShuttingDown: false,
 	}
 	ctx.Logger = log.New(os.Stdout, "", log.LstdFlags)
+	ctx.Config.App.Debug = true
 }
 
 func newHTTPRequest(method string, contentType string, body io.Reader) *http.Request {
 	req, _ := http.NewRequest(method, "http://clammit/scan", body)
 	req.Header = map[string][]string{
-		"Content-Type":    []string{contentType},
 		"X-Forwarded-For": []string{"kermit"},
+	}
+	if contentType != "" {
+		req.Header["Content-Type"] = []string{contentType}
 	}
 	return req
 }

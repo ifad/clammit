@@ -32,16 +32,17 @@ type ScanInterceptor struct {
  */
 func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body io.Reader) bool {
 	//
-	// Don't care unless it's a post
+	// Don't care unless we have some content. When the length is unknown, the length will be -1,
+	// but we attempt anyway to read the body.
 	//
-	if req.Method != "POST" && req.Method != "PUT" && req.Method != "PATCH" {
+	if req.ContentLength == 0 {
 		if ctx.Config.App.Debug {
-			ctx.Logger.Println("No need to handle method", req.Method)
+			ctx.Logger.Println("Not handling request with zero length")
 		}
 		return false
 	}
 
-	ctx.Logger.Printf("New request %s %s from %s (%s)\n", req.Method, req.URL.Path, req.RemoteAddr, req.Header.Get("X-Forwarded-For"))
+	ctx.Logger.Printf("New request %s %s len %d from %s (%s)\n", req.Method, req.URL.Path, req.ContentLength, req.RemoteAddr, req.Header.Get("X-Forwarded-For"))
 
 	//
 	// Find any attachments
