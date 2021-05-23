@@ -13,9 +13,20 @@ detection server (clamd).
 
 ## Usage
 
-Clammit is intended to be used as an internal proxy, a sort of middleware. It
-is best to only pass requests that include a file upload, however requests that
-aren't `POST`/`PUT`/`PATCH` are passed through directly without being scanned.
+Clammit parses and processes inbound HTTP requests. When it handles a request whose
+Content-Length is non-zero, it will attempt to decode multipart file uploads and pass
+each part or the whole body to ClamAV. If ClamAV detects a virus, clammit will then
+return a response with code 418 to the caller. Otherwise, it will continue processing.
+
+Clammit can be be used in two ways: as an intercepting proxy or as a virus check service.
+
+### Usage as a proxy
+
+When used as a proxy, clammit sits in between the client and your application, thus
+preventing uploads with virus files to reach your application, by returning a 418 to
+your app's client. For this mode to work, clammit must be able to contact your app
+directly, so it is best suited when clammit is executing on the same machine as your
+app.
 
 As an example, say you have a `foo` Rails application that is configured in Nginx
 like this:
@@ -30,7 +41,7 @@ server {
 
   location @foobar {
     access_log /var/log/nginx/foobar.app-access.log;
-    error_log  /var/log/nginx/foobar.app-error.log
+    error_log  /var/log/nginx/foobar.app-error.log;
 
     proxy_set_header Host $http_host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -67,6 +78,48 @@ If a virus is detected, Clammit will reject the request (with a `418` status
 code), and not forward it to your application. If you use an AJAX uploader, you
 can interpret this response and show a nice error message to end users. Or you
 could set a custom error page in Nginx.
+
+### Usage as a service
+
+When used as a service, clammit can be anywhere in your architecture, and it will
+return a 200 OK if the request has no virus, or a configurbale status code if a
+virus is detected.
+
+To scan a file, send it via HTTP - using any method you prefer - to the /clammit/scan endpoint.
+
+Example, with cURL:
+
+```sh
+curl -sf http://localhost:8438/clammit/scan -d /some/file
+```
+
+Or with Python:
+
+```py
+import requests
+
+>>> r = requests.post('http://localhost:8438/clammit/scan', files={'file': open('/etc/passwd', 'rb')})
+>>> r.status_code
+200
+
+>>> r = requests.post('http://localhost:8438/clammit/scan', files={'file': b'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'})
+>>> r.status_code
+418
+```
+
+Or with Ruby:
+
+```ruby
+require 'httparty'
+
+>> r = HTTParty.post('http://localhost:8438/clammit/scan', body: { file: File.open('/etc/passwd') })
+>> r.code
+=> 200
+
+>> r = HTTParty.post('http://localhost:8438/clammit/scan', multipart: true, body: { file: 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' })
+>> r.code
+=> 418
+```
 
 ## Configuration
 
