@@ -8,4 +8,9 @@ CLAMMIT:
  - document program architecture (interceptor, forwarder, etc)
  - not really like passing the http response around, because
    this way http response codes are scattered around the code
+ - allow to act as a checker only and not as a proxy, so to
+   not have to pass the payload around
 
+GO-CLAMD:
+
+ - fix memory leak https://github.com/ifad/clammit/pull/22
