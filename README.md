@@ -80,12 +80,13 @@ When used as a service, clammit can be anywhere in your architecture, and it wil
 return a 200 OK if the request has no virus, or a configurbale status code if a
 virus is detected.
 
-To scan a file, send it via HTTP - using any method you prefer - to the /clammit/scan endpoint.
+To scan a file, send it via HTTP - using any method you prefer - to the
+`/clammit/scan` endpoint.
 
 Example, with cURL:
 
 ```sh
-curl -sf http://localhost:8438/clammit/scan -d /some/file
+curl -sf http://localhost:8438/clammit/scan -d @/some/file
 ```
 
 Or with Python:
