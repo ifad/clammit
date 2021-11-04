@@ -242,7 +242,7 @@ func (f *Forwarder) getClient(req *http.Request) (*http.Client, *url.URL) {
 		// allow for
 		// https://stackoverflow.com/questions/12122159/how-to-do-a-https-request-with-bad-certificate
 		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: f.sslSkipVerify},
 		}
 		return &http.Client{Transport: tr}, url
 	}

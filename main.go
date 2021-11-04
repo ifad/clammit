@@ -121,6 +121,7 @@ type Ctx struct {
 type Info struct {
 	Version             string `json:"clammit_version"`
 	Address             string `json:"scan_server_url"`
+	SslSkipVerify       bool   `json:"ssl_skip_verify"`
 	PingResult          string `json:"ping_result"`
 	ScannerVersion      string `json:"scan_server_version"`
 	TestScanVirusResult string `json:"test_scan_virus"`
@@ -360,8 +361,9 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	defer func() { ctx.ActivityChan <- -1 }()
 
 	info := &Info{
-		Address: ctx.Scanner.Address(),
-		Version: version,
+		Address:       ctx.Scanner.Address(),
+		Version:       version,
+		SslSkipVerify: ctx.SslSkipVerify,
 	}
 	if err := ctx.Scanner.Ping(); err != nil {
 		info.PingResult = err.Error()
