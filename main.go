@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"gopkg.in/gcfg.v1"
 	"log"
 	"net"
 	"net/http"
@@ -23,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"gopkg.in/gcfg.v1"
 )
 
 /* This is for Go Releaser.
@@ -78,6 +79,8 @@ type ApplicationConfig struct {
 	Debug bool `gcfg:"debug"`
 	// Number of CPU threads to use
 	NumThreads int `gcfg:"num-threads"`
+	// If true, will skip SSL validation forwarding connection to use self-signed certitifates
+	SslSkipVerify bool `gcfg:"ssl-skip-verify"`
 }
 
 //
@@ -94,6 +97,7 @@ var DefaultApplicationConfig = ApplicationConfig{
 	TestPages:              true,
 	Debug:                  false,
 	NumThreads:             runtime.NumCPU(),
+	SslSkipVerify:          false,
 }
 
 //
@@ -108,6 +112,7 @@ type Ctx struct {
 	Listener        net.Listener
 	ActivityChan    chan int
 	ShuttingDown    bool
+	SslSkipVerify   bool
 }
 
 //
@@ -158,6 +163,9 @@ func main() {
 			log.Fatalf("SocketPerms invalid (expected 4-digit octal: %s", err.Error())
 		}
 	}
+
+	// use sslSkipVerify flag
+	ctx.SslSkipVerify = ctx.Config.App.SslSkipVerify
 
 	// Allow multi-proc
 	runtime.GOMAXPROCS(ctx.Config.App.NumThreads)
@@ -333,7 +341,7 @@ func scanForwardHandler(w http.ResponseWriter, req *http.Request) {
 	ctx.ActivityChan <- 1
 	defer func() { ctx.ActivityChan <- -1 }()
 
-	fw := forwarder.NewForwarder(ctx.ApplicationURL, ctx.Config.App.ContentMemoryThreshold, ctx.ScanInterceptor)
+	fw := forwarder.NewForwarder(ctx.ApplicationURL, ctx.Config.App.ContentMemoryThreshold, ctx.ScanInterceptor, ctx.SslSkipVerify)
 	fw.SetLogger(ctx.Logger, ctx.Config.App.Debug)
 	fw.HandleRequest(w, req)
 }

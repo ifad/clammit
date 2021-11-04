@@ -10,6 +10,7 @@
 package forwarder
 
 import (
+	"crypto/tls"
 	"io"
 	"io/ioutil"
 	"log"
@@ -48,17 +49,19 @@ type Forwarder struct {
 	logger                 *log.Logger
 	debug                  bool
 	contentMemoryThreshold int64
+	sslSkipVerify          bool
 }
 
 /*
  * Constructs a new forwarder. Pass in the application URL and the interceptor.
  */
-func NewForwarder(applicationURL *url.URL, contentMemoryThreshold int64, interceptor Interceptor) *Forwarder {
+func NewForwarder(applicationURL *url.URL, contentMemoryThreshold int64, interceptor Interceptor, sslSkipVerify bool) *Forwarder {
 	return &Forwarder{
 		applicationURL:         applicationURL,
 		interceptor:            interceptor,
 		logger:                 log.New(ioutil.Discard, "", 0),
 		contentMemoryThreshold: contentMemoryThreshold,
+		sslSkipVerify:          sslSkipVerify,
 	}
 }
 
@@ -236,6 +239,11 @@ func (f *Forwarder) getClient(req *http.Request) (*http.Client, *url.URL) {
 		}, url
 	} else {
 		f.logger.Printf("Forwarding to %s", applicationURL.String())
-		return &http.Client{}, url
+		// allow for
+		// https://stackoverflow.com/questions/12122159/how-to-do-a-https-request-with-bad-certificate
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		return &http.Client{Transport: tr}, url
 	}
 }

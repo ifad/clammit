@@ -144,6 +144,7 @@ content-memory-threshold | (Optional) Maximum payload size to keep in RAM. Large
 log-file                 | (Optional) The clammit log file, if ommitted will log to stdout
 test-pages               | (Optional) If true, clammit will also offer up a page to perform test uploads
 debug                    | (Optional) If true, more things will be logged
+ssl-skip-verify          | (Optional) If true, will skip SSL validation forwarding connection to use self-signed certitifates
 
 The listen address can be a TCP port or Unix socket, e.g.:
 
@@ -178,6 +179,8 @@ steps manually if you want.
 
 You will need external access to github and code.google.com to load the
 third-party packages that Clammit depends on: [go-clamd][] and [gcfg][].
+
+The release build also need [goreleaser](https://goreleaser.com/install/)
 
 Once you have this, simple run:
 
@@ -247,6 +250,18 @@ testing/ sub-directory.
 ## Web app
 
 In the web/ directory is a simple Sinatra server to act as the application (for testing purposes).
+
+install bundler
+```
+gem install sinatra
+gem install bundler
+```
+
+run 
+```
+cd web
+bundle install
+```
 
 ## Tests
 

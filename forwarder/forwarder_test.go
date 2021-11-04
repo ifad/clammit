@@ -67,7 +67,45 @@ func TestInterceptor(t *testing.T) {
 		w.WriteHeader(204)
 		w.Write([]byte("This is a response"))
 		return true
+	}), false)
+
+	req, _ := http.NewRequest("POST", "http://localhost:9999/bar?crazy=true", strings.NewReader(bodyText))
+	w := NewTestResponseWriter()
+
+	fw.HandleRequest(w, req)
+
+	if w.StatusCode != 204 {
+		t.Fatalf("Response: StatusCode was %d, expected %d", w.StatusCode, 204)
+	}
+	if w.Header().Get("Foo") != "bar" {
+		t.Fatalf("Response: Header['foo'] not set")
+	}
+	if w.Body.String() != "This is a response" {
+		t.Fatalf("Response: Body is: %s", w.Body.String())
+	}
+}
+
+func TestInterceptorNonValidSll(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("Request was forwarded but should not have been")
 	}))
+	defer ts.Close()
+	tsURL, _ := url.Parse(ts.URL)
+
+	bodyText := "This is the request body"
+
+	fw := NewForwarder(tsURL, 10000, testInterceptor(func(w http.ResponseWriter, req *http.Request, body io.Reader) bool {
+		buf := make([]byte, 10000)
+		if n, err := body.Read(buf); err != nil && err != io.EOF {
+			t.Fatalf("Got error reading body: %s", err.Error())
+		} else if string(buf[0:n]) != bodyText {
+			t.Fatalf("Read body failed: X%vX, expected X%vX", string(buf[0:n]), bodyText)
+		}
+		w.Header().Set("foo", "bar")
+		w.WriteHeader(204)
+		w.Write([]byte("This is a response"))
+		return true
+	}), true)
 
 	req, _ := http.NewRequest("POST", "http://localhost:9999/bar?crazy=true", strings.NewReader(bodyText))
 	w := NewTestResponseWriter()
@@ -118,7 +156,7 @@ func TestForwarding(t *testing.T) {
 	defer ts.Close()
 	tsURL, _ := url.Parse(ts.URL)
 
-	fw := NewForwarder(tsURL, 10000, nil)
+	fw := NewForwarder(tsURL, 10000, nil, false)
 
 	req, _ := http.NewRequest("POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText))
 	req.Header.Set("myheader", "headervalue")
@@ -154,7 +192,7 @@ func TestHostForwarding(t *testing.T) {
 	defer ts.Close()
 	tsURL, _ := url.Parse(ts.URL)
 
-	fw := NewForwarder(tsURL, 10000, nil)
+	fw := NewForwarder(tsURL, 10000, nil, false)
 
 	req, _ := http.NewRequest("POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText))
 	req.Header.Set("myheader", "headervalue")
@@ -175,7 +213,7 @@ func TestHostForwarding(t *testing.T) {
 	defer ts.Close()
 	tsURL, _ = url.Parse(ts.URL)
 
-	fw = NewForwarder(tsURL, 10000, nil)
+	fw = NewForwarder(tsURL, 10000, nil, false)
 
 	req, _ = http.NewRequest("POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText))
 	req.Host = "testhost"
@@ -189,7 +227,7 @@ func TestHostForwarding(t *testing.T) {
 func TestMultiForwarder(t *testing.T) {
 	requestText := "This is a request"
 
-	fw := NewForwarder(nil, 10000, nil)
+	fw := NewForwarder(nil, 10000, nil, false)
 
 	// Build two backends
 	backend1ResponseText := "backend1"
@@ -252,7 +290,7 @@ func TestForwardingWithRedirectPOST(t *testing.T) {
 	defer ts.Close()
 	tsURL, _ := url.Parse(ts.URL)
 
-	fw := NewForwarder(tsURL, 10000, nil)
+	fw := NewForwarder(tsURL, 10000, nil, false)
 
 	req, _ := http.NewRequest("POST", "http://localhost:99999/bar?crazy=true", strings.NewReader(requestText))
 
@@ -274,9 +312,32 @@ func TestForwardingWithRedirectGET(t *testing.T) {
 	defer ts.Close()
 	tsURL, _ := url.Parse(ts.URL)
 
-	fw := NewForwarder(tsURL, 10000, nil)
+	fw := NewForwarder(tsURL, 10000, nil, false)
 
 	req, _ := http.NewRequest("GET", "http://localhost:99999/bar?crazy=true", emptyBody())
+	req.Header.Set("X-Clammit-Backend", tsURL.String())
+
+	w := NewTestResponseWriter()
+
+	fw.HandleRequest(w, req)
+
+	require.Equal(t, 302, w.StatusCode)
+	assert.Equal(t, "https://localhost:12345/foobar", w.Header().Get("Location"))
+}
+
+func TestForwardingWithRedirectGETAndNoSll(t *testing.T) {
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Add("Location", "https://localhost:12345/foobar")
+		w.WriteHeader(302)
+	}))
+	defer ts.Close()
+	tsURL, _ := url.Parse(ts.URL)
+
+	fw := NewForwarder(tsURL, 10000, nil, true)
+
+	req, _ := http.NewRequest("GET", "https://localhost:99999/bar?crazy=true", emptyBody())
 	req.Header.Set("X-Clammit-Backend", tsURL.String())
 
 	w := NewTestResponseWriter()

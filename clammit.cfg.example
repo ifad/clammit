@@ -31,3 +31,9 @@ log-file        = log/clammit.log
 # the virus scanning
 #
 #test-pages      = true
+
+#
+# If true, will skip SSL validation forwarding connection to use self-signed certitifates
+# default = false
+#
+#ssl-skip-verify = false
