@@ -21,6 +21,9 @@ fmt:
 clean:
 	rm -rf dist/
 
+clean-win:
+	rmdir /q /s dist
+
 application:
 	go install
 
