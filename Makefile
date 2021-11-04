@@ -3,6 +3,9 @@ all:	gets application
 linux:
 	GOOS=linux GOARCH=amd64 make application
 
+linux-win:
+	set GOOS=linux && set GOARCH=amd64 && make application
+
 test: gets
 	go test ./...
 
@@ -21,14 +24,14 @@ fmt:
 clean:
 	rm -rf dist/
 
-clean-win:
-	rmdir /q /s dist
-
 application:
 	go install
 
 gets:
 	go get
+
+build:
+	go build
 
 release:
 	goreleaser release
