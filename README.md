@@ -199,6 +199,24 @@ make cleanimports | Removes the downloaded third-party source packages
 make gets         | Downloads the third-party source packages, if they are not already there
 make test         | Runs the application unit tests
 
+## Releasing
+
+after all build and tests are done release a new version
+
+1. tag the code with a release number "v0.0.0" or "v.0.0.0-any-additional-string" and replace 0.0.0 with your releae number
+2. create new access token that has access to write releases (on your fork)
+3. set the environment variable
+
+```
+  set GITHUB_TOKEN=.....your-token
+```
+4. run make release. It will take some time because it will 
+
+```
+  make release
+```
+5. use your release in the installation
+
 ## Installation
 
 1. Copy the compiled binary (bin/clammit), either into your project repository, or to an installation area.
