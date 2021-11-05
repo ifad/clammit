@@ -144,7 +144,7 @@ content-memory-threshold | (Optional) Maximum payload size to keep in RAM. Large
 log-file                 | (Optional) The clammit log file, if ommitted will log to stdout
 test-pages               | (Optional) If true, clammit will also offer up a page to perform test uploads
 debug                    | (Optional) If true, more things will be logged
-ssl-skip-verify          | (Optional) If true, will skip SSL validation forwarding connection to use self-signed certitifates
+ssl-skip-verify          | (Optional) if true, it will not perform TLS certificate verification, allowing connections to servers using self-signed or otherwise untrusted certificates. Use with care, it is always preferable to perform certificate verification.
 
 The listen address can be a TCP port or Unix socket, e.g.:
 
