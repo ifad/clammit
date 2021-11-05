@@ -33,7 +33,9 @@ log-file        = log/clammit.log
 #test-pages      = true
 
 #
-# If true, will skip SSL validation forwarding connection to use self-signed certitifates
+# if true, it will not perform TLS certificate verification, allowing connections 
+# to servers using self-signed or otherwise untrusted certificates. Use with care, 
+# it is always preferable to perform certificate verification.
 # default = false
 #
 #ssl-skip-verify = false
