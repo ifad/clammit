@@ -27,5 +27,8 @@ application:
 gets:
 	go get
 
+build:
+	go build
+
 release:
 	goreleaser release

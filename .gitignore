@@ -8,3 +8,6 @@ src/code.google.com/*
 log
 log/*
 etc
+__debug_bin
+clammit.exe
+clammit.cfg

@@ -31,3 +31,11 @@ log-file        = log/clammit.log
 # the virus scanning
 #
 #test-pages      = true
+
+#
+# if true, it will not perform TLS certificate verification, allowing connections 
+# to servers using self-signed or otherwise untrusted certificates. Use with care, 
+# it is always preferable to perform certificate verification.
+# default = false
+#
+#ssl-skip-verify = false

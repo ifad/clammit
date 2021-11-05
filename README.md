@@ -144,6 +144,7 @@ content-memory-threshold | (Optional) Maximum payload size to keep in RAM. Large
 log-file                 | (Optional) The clammit log file, if ommitted will log to stdout
 test-pages               | (Optional) If true, clammit will also offer up a page to perform test uploads
 debug                    | (Optional) If true, more things will be logged
+ssl-skip-verify          | (Optional) if true, it will not perform TLS certificate verification, allowing connections to servers using self-signed or otherwise untrusted certificates. Use with care, it is always preferable to perform certificate verification.
 
 The listen address can be a TCP port or Unix socket, e.g.:
 
@@ -179,6 +180,8 @@ steps manually if you want.
 You will need external access to github and code.google.com to load the
 third-party packages that Clammit depends on: [go-clamd][] and [gcfg][].
 
+The release build also need [goreleaser](https://goreleaser.com/install/)
+
 Once you have this, simple run:
 
 ```sh
@@ -195,6 +198,24 @@ make clean        | Removes the compiled binary and intermediate libraries (in p
 make cleanimports | Removes the downloaded third-party source packages
 make gets         | Downloads the third-party source packages, if they are not already there
 make test         | Runs the application unit tests
+
+## Releasing
+
+after all build and tests are done release a new version
+
+1. tag the code with a release number "v0.0.0" or "v.0.0.0-any-additional-string" and replace 0.0.0 with your releae number
+2. create new access token that has access to write releases (on your fork)
+3. set the environment variable
+
+```
+  set GITHUB_TOKEN=.....your-token
+```
+4. run make release. It will take some time because it will 
+
+```
+  make release
+```
+5. use your release in the installation
 
 ## Installation
 
@@ -247,6 +268,18 @@ testing/ sub-directory.
 ## Web app
 
 In the web/ directory is a simple Sinatra server to act as the application (for testing purposes).
+
+install bundler
+```
+gem install sinatra
+gem install bundler
+```
+
+run 
+```
+cd web
+bundle install
+```
 
 ## Tests
 
