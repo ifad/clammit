@@ -3,9 +3,6 @@ all:	gets application
 linux:
 	GOOS=linux GOARCH=amd64 make application
 
-linux-win:
-	set GOOS=linux && set GOARCH=amd64 && make application
-
 test: gets
 	go test ./...
 
