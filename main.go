@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"gopkg.in/gcfg.v1"
 	"log"
 	"net"
 	"net/http"
@@ -23,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"gopkg.in/gcfg.v1"
 )
 
 /* This is for Go Releaser.
@@ -30,9 +31,7 @@ import (
  */
 var version = "master"
 
-//
 // Configuration structure, designed for gcfg
-//
 type Config struct {
 	App ApplicationConfig `gcfg:"application"`
 }
@@ -78,11 +77,11 @@ type ApplicationConfig struct {
 	Debug bool `gcfg:"debug"`
 	// Number of CPU threads to use
 	NumThreads int `gcfg:"num-threads"`
+	// Maximum file size to scan
+	MaxFileSize int64 `gcfg:"max-file-size"`
 }
 
-//
 // Default configuration
-//
 var DefaultApplicationConfig = ApplicationConfig{
 	Listen:                 ":8438",
 	SocketPerms:            "0777",
@@ -96,9 +95,7 @@ var DefaultApplicationConfig = ApplicationConfig{
 	NumThreads:             runtime.NumCPU(),
 }
 
-//
 // Application context
-//
 type Ctx struct {
 	Config          Config
 	ApplicationURL  *url.URL
@@ -110,9 +107,7 @@ type Ctx struct {
 	ShuttingDown    bool
 }
 
-//
 // JSON server information response
-//
 type Info struct {
 	Version             string `json:"clammit_version"`
 	Address             string `json:"scan_server_url"`
@@ -122,9 +117,7 @@ type Info struct {
 	TestScanCleanResult string `json:"test_scan_clean"`
 }
 
-//
 // Global variables and config
-//
 var ctx *Ctx
 var configFile string
 var EICAR = []byte(`X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`)

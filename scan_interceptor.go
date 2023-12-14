@@ -29,9 +29,9 @@ type ScanInterceptor struct {
  * returns True if the body contains a virus
  */
 func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body io.Reader) bool {
-	// If the content length is greater than 1MB, forward the request without scanning.
-	if req.ContentLength > 1024*1024 {
-		ctx.Logger.Println("Not scanning file larger than 1MB")
+	// Don't scan if the content length is too large
+	if req.ContentLength > ctx.Config.App.MaxFileSize {
+		ctx.Logger.Printf("Not scanning file larger than %d bytes", ctx.Config.App.MaxFileSize)
 		return false
 	}
 
