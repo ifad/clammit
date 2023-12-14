@@ -58,7 +58,9 @@ func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 	err := maxSize.Set(ctx.Config.App.MaxFileSize)
 	if err != nil {
 		ctx.Logger.Printf("Error parsing max file size: %v", err)
-		return false
+		http.Error(w, "Bad Request", 400)
+		// Return true to indicate an error condition
+		return true
 	}
 	// Don't scan if the content length is too large
 	if req.ContentLength > int64(maxSize) {
