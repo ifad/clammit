@@ -78,7 +78,7 @@ type ApplicationConfig struct {
 	// Number of CPU threads to use
 	NumThreads int `gcfg:"num-threads"`
 	// Maximum file size to scan
-	MaxFileSize int64 `gcfg:"max-file-size"`
+	MaxFileSize string `gcfg:"max-file-size"`
 }
 
 // Default configuration
