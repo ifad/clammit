@@ -15,9 +15,7 @@ import (
 	"net/http"
 )
 
-//
 // The implementation of the Scan interceptor
-//
 type ScanInterceptor struct {
 	VirusStatusCode int
 	Scanner         scanner.Scanner
@@ -31,6 +29,12 @@ type ScanInterceptor struct {
  * returns True if the body contains a virus
  */
 func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body io.Reader) bool {
+	// If the content length is greater than 1MB, forward the request without scanning.
+	if req.ContentLength > 1024*1024 {
+		ctx.Logger.Println("Not scanning file larger than 1MB")
+		return false
+	}
+
 	//
 	// Don't care unless we have some content. When the length is unknown, the length will be -1,
 	// but we attempt anyway to read the body.
