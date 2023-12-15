@@ -27,6 +27,13 @@ clamd-url       = unix:/var/run/clamav/clamd.ctl
 log-file        = log/clammit.log
 
 #
+# The maximum file size to scan. Files larger than this will not be scanned.
+# This can be specified as a string using units like "KB", "MB", or "GB".
+# For example, "10MB" would set the maximum file size to 10 megabytes.
+# If this setting is not provided, the default value is 25MB.
+#max-file-size = 10MB
+
+#
 # Set this to true to have this application serve an upload form to test
 # the virus scanning
 #

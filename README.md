@@ -131,6 +131,7 @@ clamd-url       = http://host:port/
 log-file        = /var/log/clammit.log
 debug           = true
 test-pages      = true
+max-file-size   = 25MB
 ```
 
 Setting                  | Description
@@ -144,6 +145,7 @@ content-memory-threshold | (Optional) Maximum payload size to keep in RAM. Large
 log-file                 | (Optional) The clammit log file, if ommitted will log to stdout
 test-pages               | (Optional) If true, clammit will also offer up a page to perform test uploads
 debug                    | (Optional) If true, more things will be logged
+max-file-size            | (Optional) The maximum file size to scan. Files larger than this will not be scanned. Default 25MB
 
 The listen address can be a TCP port or Unix socket, e.g.:
 
@@ -155,6 +157,8 @@ The same format applies to the `clamd-url` and `application-url` parameters.
 By default Clammit will look for a `X-Clammit-Backend` header, and use that to
 decide where to send requests to. If you only have one backend server, you can
 set it in the `application-url` configuration option, and omit the header.
+
+The `max-file-size` setting allows you to specify a maximum file size for scanning. If an uploaded file size exceeds this limit, the file will not be scanned. This can be specified as a string using units like "KB", "MB", or "GB". For example, "10MB" would set the maximum file size to 10 megabytes. If this setting is not provided, the default value is 25MB.
 
 ## Architecture
 

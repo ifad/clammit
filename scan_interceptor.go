@@ -13,14 +13,36 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
-//
 // The implementation of the Scan interceptor
-//
 type ScanInterceptor struct {
 	VirusStatusCode int
 	Scanner         scanner.Scanner
+}
+
+type ByteSize int64
+
+func (b *ByteSize) Set(s string) error {
+	var scale int64
+	switch strings.ToLower(s[len(s)-2:]) {
+	case "kb":
+		scale = 1024
+	case "mb":
+		scale = 1024 * 1024
+	case "gb":
+		scale = 1024 * 1024 * 1024
+	default:
+		return fmt.Errorf("invalid size: %s", s)
+	}
+	num, err := strconv.ParseInt(s[:len(s)-2], 10, 64)
+	if err != nil {
+		return err
+	}
+	*b = ByteSize(num * scale)
+	return nil
 }
 
 /*
@@ -31,6 +53,23 @@ type ScanInterceptor struct {
  * returns True if the body contains a virus
  */
 func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body io.Reader) bool {
+	// Convert MaxFileSize from string to int64
+	var maxSize ByteSize
+	if ctx.Config.App.MaxFileSize != "" {
+		err := maxSize.Set(ctx.Config.App.MaxFileSize)
+		if err != nil {
+			ctx.Logger.Printf("Error parsing max file size: %v", err)
+			http.Error(w, "Bad Request", 400)
+			// Return true to indicate an error condition
+			return true
+		}
+		// Don't scan if the content length is too large
+		if req.ContentLength > int64(maxSize) {
+			ctx.Logger.Printf("Not scanning file larger than %s", ctx.Config.App.MaxFileSize)
+			return false
+		}
+	}
+
 	//
 	// Don't care unless we have some content. When the length is unknown, the length will be -1,
 	// but we attempt anyway to read the body.
