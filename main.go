@@ -30,9 +30,7 @@ import (
  */
 var version = "master"
 
-//
 // Configuration structure, designed for gcfg
-//
 type Config struct {
 	App ApplicationConfig `gcfg:"application"`
 }
@@ -80,9 +78,7 @@ type ApplicationConfig struct {
 	NumThreads int `gcfg:"num-threads"`
 }
 
-//
 // Default configuration
-//
 var DefaultApplicationConfig = ApplicationConfig{
 	Listen:                 ":8438",
 	SocketPerms:            "0777",
@@ -96,9 +92,7 @@ var DefaultApplicationConfig = ApplicationConfig{
 	NumThreads:             runtime.NumCPU(),
 }
 
-//
 // Application context
-//
 type Ctx struct {
 	Config          Config
 	ApplicationURL  *url.URL
@@ -110,9 +104,7 @@ type Ctx struct {
 	ShuttingDown    bool
 }
 
-//
 // JSON server information response
-//
 type Info struct {
 	Version             string `json:"clammit_version"`
 	Address             string `json:"scan_server_url"`
@@ -122,9 +114,7 @@ type Info struct {
 	TestScanCleanResult string `json:"test_scan_clean"`
 }
 
-//
 // Global variables and config
-//
 var ctx *Ctx
 var configFile string
 var EICAR = []byte(`X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`)
@@ -137,17 +127,7 @@ func main() {
 	/*
 	 * Construct configuration, set up logging
 	 */
-	flag.Parse()
-	ctx = &Ctx{
-		ActivityChan: make(chan int),
-		ShuttingDown: false,
-	}
-
-	ctx.Config.App = DefaultApplicationConfig
-
-	if err := gcfg.ReadFileInto(&ctx.Config, configFile); err != nil {
-		log.Fatalf("Configuration read failure: %s", err.Error())
-	}
+	constructConfig()
 
 	// Socket perms are octal!
 	socketPerms := 0777
@@ -201,6 +181,87 @@ func main() {
 		beGraceful() // graceful shutdown from here on in
 		ctx.Logger.Println("Listening on", ctx.Config.App.Listen)
 		http.Serve(listener, router)
+	}
+}
+
+/*
+ * Sets the configuration from the file and environment variables
+ */
+func constructConfig() {
+	flag.Parse()
+	ctx = &Ctx{
+		ActivityChan: make(chan int),
+		ShuttingDown: false,
+	}
+
+	ctx.Config.App = DefaultApplicationConfig
+
+	// Read the configuration file if configfile is set
+	if configFile != "" {
+		if err := gcfg.ReadFileInto(&ctx.Config, configFile); err != nil {
+			log.Fatalf("Configuration read failure: %s", err.Error())
+		}
+	}
+
+	// Check for environmant variables to overwrite config
+	if envListen := os.Getenv("CLAMMIT_LISTEN"); envListen != "" {
+		ctx.Config.App.Listen = envListen
+	}
+
+	if envSocketPerms := os.Getenv("CLAMMIT_SOCKET_PERMS"); envSocketPerms != "" {
+		ctx.Config.App.SocketPerms = envSocketPerms
+	}
+
+	if envApplicationURL := os.Getenv("CLAMMIT_APPLICATION_URL"); envApplicationURL != "" {
+		ctx.Config.App.ApplicationURL = envApplicationURL
+	}
+
+	if envClamdURL := os.Getenv("CLAMMIT_CLAMD_URL"); envClamdURL != "" {
+		ctx.Config.App.ClamdURL = envClamdURL
+	}
+
+	if envVirusStatusCode := os.Getenv("CLAMMIT_VIRUS_STATUS_CODE"); envVirusStatusCode != "" {
+		if vs, err := strconv.Atoi(envVirusStatusCode); err == nil {
+			ctx.Config.App.VirusStatusCode = vs
+		} else {
+			log.Fatalf("VirusStatusCode invalid (expected integer): %s", err.Error())
+		}
+	}
+
+	if envContentMemoryThreshold := os.Getenv("CLAMMIT_CONTENT_MEMORY_THRESHOLD"); envContentMemoryThreshold != "" {
+		if cmt, err := strconv.ParseInt(envContentMemoryThreshold, 10, 64); err == nil {
+			ctx.Config.App.ContentMemoryThreshold = cmt
+		} else {
+			log.Fatalf("ContentMemoryThreshold invalid (expected integer): %s", err.Error())
+		}
+	}
+
+	if envLogfile := os.Getenv("CLAMMIT_LOGFILE"); envLogfile != "" {
+		ctx.Config.App.Logfile = envLogfile
+	}
+
+	if envTestPages := os.Getenv("CLAMMIT_TEST_PAGES"); envTestPages != "" {
+		if tp, err := strconv.ParseBool(envTestPages); err == nil {
+			ctx.Config.App.TestPages = tp
+		} else {
+			log.Fatalf("TestPages invalid (expected boolean): %s", err.Error())
+		}
+	}
+
+	if envDebug := os.Getenv("CLAMMIT_DEBUG"); envDebug != "" {
+		if d, err := strconv.ParseBool(envDebug); err == nil {
+			ctx.Config.App.Debug = d
+		} else {
+			log.Fatalf("Debug invalid (expected boolean): %s", err.Error())
+		}
+	}
+
+	if envNumThreads := os.Getenv("CLAMMIT_NUM_THREADS"); envNumThreads != "" {
+		if nt, err := strconv.Atoi(envNumThreads); err == nil {
+			ctx.Config.App.NumThreads = nt
+		} else {
+			log.Fatalf("NumThreads invalid (expected integer): %s", err.Error())
+		}
 	}
 }
 
