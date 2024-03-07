@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-type Context struct {
-	Config Config
-}
-
 func disableIPv6(t *testing.T) bool {
 	value, set := os.LookupEnv("DISABLE_IPV6")
 	if set && value == "1" {
@@ -131,7 +127,6 @@ func TestGetListener_Unix(t *testing.T) {
 }
 
 func TestConstructConfig_Env(t *testing.T) {
-	// Test environment variable overrides
 	os.Setenv("CLAMMIT_LISTEN", ":1234")
 	os.Setenv("CLAMMIT_SOCKET_PERMS", "0444")
 	os.Setenv("CLAMMIT_APPLICATION_URL", "http://foo.bar:123")
