@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"gopkg.in/gcfg.v1"
 	"log"
 	"net"
 	"net/http"
@@ -23,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"gopkg.in/gcfg.v1"
 )
 
 /* This is for Go Releaser.
@@ -185,6 +186,52 @@ func main() {
 }
 
 /*
+ * Returns the value of an environment variable, or a default value
+ */
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
+/*
+ * Returns the value of an environment variable casted as int, or a default value
+ */
+func getIntEnv(key string, fallback int) int {
+	if value, ok := os.LookupEnv(key); ok {
+		if i, err := strconv.Atoi(value); err == nil {
+			return i
+		}
+	}
+	return fallback
+}
+
+/*
+ * Returns the value of an environment variable casted as int64, or a default value
+ */
+func getInt64Env(key string, fallback int64) int64 {
+	if value, ok := os.LookupEnv(key); ok {
+		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return i
+		}
+	}
+	return fallback
+}
+
+/*
+ * Returns the value of an environment variable casted as boolean, or a default value
+ */
+func getBoolEnv(key string, fallback bool) bool {
+	if value, ok := os.LookupEnv(key); ok {
+		if b, err := strconv.ParseBool(value); err == nil {
+			return b
+		}
+	}
+	return fallback
+}
+
+/*
  * Sets the configuration from the file and environment variables
  */
 func constructConfig() {
@@ -204,65 +251,16 @@ func constructConfig() {
 	}
 
 	// Check for environmant variables to overwrite config
-	if envListen := os.Getenv("CLAMMIT_LISTEN"); envListen != "" {
-		ctx.Config.App.Listen = envListen
-	}
-
-	if envSocketPerms := os.Getenv("CLAMMIT_SOCKET_PERMS"); envSocketPerms != "" {
-		ctx.Config.App.SocketPerms = envSocketPerms
-	}
-
-	if envApplicationURL := os.Getenv("CLAMMIT_APPLICATION_URL"); envApplicationURL != "" {
-		ctx.Config.App.ApplicationURL = envApplicationURL
-	}
-
-	if envClamdURL := os.Getenv("CLAMMIT_CLAMD_URL"); envClamdURL != "" {
-		ctx.Config.App.ClamdURL = envClamdURL
-	}
-
-	if envVirusStatusCode := os.Getenv("CLAMMIT_VIRUS_STATUS_CODE"); envVirusStatusCode != "" {
-		if vs, err := strconv.Atoi(envVirusStatusCode); err == nil {
-			ctx.Config.App.VirusStatusCode = vs
-		} else {
-			log.Fatalf("VirusStatusCode invalid (expected integer): %s", err.Error())
-		}
-	}
-
-	if envContentMemoryThreshold := os.Getenv("CLAMMIT_CONTENT_MEMORY_THRESHOLD"); envContentMemoryThreshold != "" {
-		if cmt, err := strconv.ParseInt(envContentMemoryThreshold, 10, 64); err == nil {
-			ctx.Config.App.ContentMemoryThreshold = cmt
-		} else {
-			log.Fatalf("ContentMemoryThreshold invalid (expected integer): %s", err.Error())
-		}
-	}
-
-	if envLogfile := os.Getenv("CLAMMIT_LOGFILE"); envLogfile != "" {
-		ctx.Config.App.Logfile = envLogfile
-	}
-
-	if envTestPages := os.Getenv("CLAMMIT_TEST_PAGES"); envTestPages != "" {
-		if tp, err := strconv.ParseBool(envTestPages); err == nil {
-			ctx.Config.App.TestPages = tp
-		} else {
-			log.Fatalf("TestPages invalid (expected boolean): %s", err.Error())
-		}
-	}
-
-	if envDebug := os.Getenv("CLAMMIT_DEBUG"); envDebug != "" {
-		if d, err := strconv.ParseBool(envDebug); err == nil {
-			ctx.Config.App.Debug = d
-		} else {
-			log.Fatalf("Debug invalid (expected boolean): %s", err.Error())
-		}
-	}
-
-	if envNumThreads := os.Getenv("CLAMMIT_NUM_THREADS"); envNumThreads != "" {
-		if nt, err := strconv.Atoi(envNumThreads); err == nil {
-			ctx.Config.App.NumThreads = nt
-		} else {
-			log.Fatalf("NumThreads invalid (expected integer): %s", err.Error())
-		}
-	}
+	ctx.Config.App.Listen = getEnv("CLAMMIT_LISTEN", ctx.Config.App.Listen)
+	ctx.Config.App.SocketPerms = getEnv("CLAMMIT_SOCKET_PERMS", ctx.Config.App.SocketPerms)
+	ctx.Config.App.ApplicationURL = getEnv("CLAMMIT_APPLICATION_URL", ctx.Config.App.ApplicationURL)
+	ctx.Config.App.ClamdURL = getEnv("CLAMMIT_CLAMD_URL", ctx.Config.App.ClamdURL)
+	ctx.Config.App.VirusStatusCode = getIntEnv("CLAMMIT_VIRUS_STATUS_CODE", ctx.Config.App.VirusStatusCode)
+	ctx.Config.App.ContentMemoryThreshold = getInt64Env("CLAMMIT_CONTENT_MEMORY_THRESHOLD", ctx.Config.App.ContentMemoryThreshold)
+	ctx.Config.App.Logfile = getEnv("CLAMMIT_LOGFILE", ctx.Config.App.Logfile)
+	ctx.Config.App.TestPages = getBoolEnv("CLAMMIT_TEST_PAGES", ctx.Config.App.TestPages)
+	ctx.Config.App.Debug = getBoolEnv("CLAMMIT_DEBUG", ctx.Config.App.Debug)
+	ctx.Config.App.NumThreads = getIntEnv("CLAMMIT_NUM_THREADS", ctx.Config.App.NumThreads)
 }
 
 /*

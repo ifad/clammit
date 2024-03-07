@@ -168,11 +168,11 @@ func TestConstructConfig_Env(t *testing.T) {
 		t.Errorf("Expected Logfile to be '/var/log/foo.log', got %s", ctx.Config.App.Logfile)
 	}
 
-	if ctx.Config.App.TestPages != false {
+	if ctx.Config.App.TestPages {
 		t.Errorf("Expected TestPages to be false, got %t", ctx.Config.App.TestPages)
 	}
 
-	if ctx.Config.App.Debug != true {
+	if !ctx.Config.App.Debug {
 		t.Errorf("Expected Debug to be true, got %t", ctx.Config.App.Debug)
 	}
 
