@@ -15,9 +15,7 @@ import (
 	"net/http"
 )
 
-//
 // The implementation of the Scan interceptor
-//
 type ScanInterceptor struct {
 	VirusStatusCode int
 	Scanner         scanner.Scanner
