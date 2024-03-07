@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"gopkg.in/gcfg.v1"
 	"log"
 	"net"
 	"net/http"
@@ -23,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"gopkg.in/gcfg.v1"
 )
 
 /* This is for Go Releaser.
@@ -30,9 +31,7 @@ import (
  */
 var version = "master"
 
-//
 // Configuration structure, designed for gcfg
-//
 type Config struct {
 	App ApplicationConfig `gcfg:"application"`
 }
@@ -80,9 +79,7 @@ type ApplicationConfig struct {
 	NumThreads int `gcfg:"num-threads"`
 }
 
-//
 // Default configuration
-//
 var DefaultApplicationConfig = ApplicationConfig{
 	Listen:                 ":8438",
 	SocketPerms:            "0777",
@@ -96,9 +93,7 @@ var DefaultApplicationConfig = ApplicationConfig{
 	NumThreads:             runtime.NumCPU(),
 }
 
-//
 // Application context
-//
 type Ctx struct {
 	Config          Config
 	ApplicationURL  *url.URL
@@ -110,9 +105,7 @@ type Ctx struct {
 	ShuttingDown    bool
 }
 
-//
 // JSON server information response
-//
 type Info struct {
 	Version             string `json:"clammit_version"`
 	Address             string `json:"scan_server_url"`
@@ -122,9 +115,7 @@ type Info struct {
 	TestScanCleanResult string `json:"test_scan_clean"`
 }
 
-//
 // Global variables and config
-//
 var ctx *Ctx
 var configFile string
 var EICAR = []byte(`X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`)
@@ -137,17 +128,7 @@ func main() {
 	/*
 	 * Construct configuration, set up logging
 	 */
-	flag.Parse()
-	ctx = &Ctx{
-		ActivityChan: make(chan int),
-		ShuttingDown: false,
-	}
-
-	ctx.Config.App = DefaultApplicationConfig
-
-	if err := gcfg.ReadFileInto(&ctx.Config, configFile); err != nil {
-		log.Fatalf("Configuration read failure: %s", err.Error())
-	}
+	constructConfig()
 
 	// Socket perms are octal!
 	socketPerms := 0777
@@ -202,6 +183,84 @@ func main() {
 		ctx.Logger.Println("Listening on", ctx.Config.App.Listen)
 		http.Serve(listener, router)
 	}
+}
+
+/*
+ * Returns the value of an environment variable, or a default value
+ */
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
+/*
+ * Returns the value of an environment variable casted as int, or a default value
+ */
+func getIntEnv(key string, fallback int) int {
+	if value, ok := os.LookupEnv(key); ok {
+		if i, err := strconv.Atoi(value); err == nil {
+			return i
+		}
+	}
+	return fallback
+}
+
+/*
+ * Returns the value of an environment variable casted as int64, or a default value
+ */
+func getInt64Env(key string, fallback int64) int64 {
+	if value, ok := os.LookupEnv(key); ok {
+		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return i
+		}
+	}
+	return fallback
+}
+
+/*
+ * Returns the value of an environment variable casted as boolean, or a default value
+ */
+func getBoolEnv(key string, fallback bool) bool {
+	if value, ok := os.LookupEnv(key); ok {
+		if b, err := strconv.ParseBool(value); err == nil {
+			return b
+		}
+	}
+	return fallback
+}
+
+/*
+ * Sets the configuration from the file and environment variables
+ */
+func constructConfig() {
+	flag.Parse()
+	ctx = &Ctx{
+		ActivityChan: make(chan int),
+		ShuttingDown: false,
+	}
+
+	ctx.Config.App = DefaultApplicationConfig
+
+	// Read the configuration file if configfile is set
+	if configFile != "" {
+		if err := gcfg.ReadFileInto(&ctx.Config, configFile); err != nil {
+			log.Fatalf("Configuration read failure: %s", err.Error())
+		}
+	}
+
+	// Check for environmant variables to overwrite config
+	ctx.Config.App.Listen = getEnv("CLAMMIT_LISTEN", ctx.Config.App.Listen)
+	ctx.Config.App.SocketPerms = getEnv("CLAMMIT_SOCKET_PERMS", ctx.Config.App.SocketPerms)
+	ctx.Config.App.ApplicationURL = getEnv("CLAMMIT_APPLICATION_URL", ctx.Config.App.ApplicationURL)
+	ctx.Config.App.ClamdURL = getEnv("CLAMMIT_CLAMD_URL", ctx.Config.App.ClamdURL)
+	ctx.Config.App.VirusStatusCode = getIntEnv("CLAMMIT_VIRUS_STATUS_CODE", ctx.Config.App.VirusStatusCode)
+	ctx.Config.App.ContentMemoryThreshold = getInt64Env("CLAMMIT_CONTENT_MEMORY_THRESHOLD", ctx.Config.App.ContentMemoryThreshold)
+	ctx.Config.App.Logfile = getEnv("CLAMMIT_LOGFILE", ctx.Config.App.Logfile)
+	ctx.Config.App.TestPages = getBoolEnv("CLAMMIT_TEST_PAGES", ctx.Config.App.TestPages)
+	ctx.Config.App.Debug = getBoolEnv("CLAMMIT_DEBUG", ctx.Config.App.Debug)
+	ctx.Config.App.NumThreads = getIntEnv("CLAMMIT_NUM_THREADS", ctx.Config.App.NumThreads)
 }
 
 /*
