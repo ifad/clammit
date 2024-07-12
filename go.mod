@@ -1,4 +1,4 @@
-module clammit
+module github.com/ifad/clammit
 
 go 1.21
 
