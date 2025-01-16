@@ -85,6 +85,8 @@ type ApplicationConfig struct {
 	StatsdAddress string `gcfg:"statsd-address"`
 	// StatsD namespace
 	StatsdNamespace string `gcfg:"statsd-namespace"`
+	// StatsD tags
+	StatsdTags []string `gcfg:"statsd-tags"`
 }
 
 // Default configuration
@@ -102,6 +104,7 @@ var DefaultApplicationConfig = ApplicationConfig{
 	MaxFileSize:            "25MB",
 	StatsdAddress:          "",
 	StatsdNamespace:        "clammit",
+	StatsdTags:             nil,
 }
 
 // Application context
@@ -166,7 +169,7 @@ func main() {
 	}
 
 	// Initialize the StatsD client with user-configured values
-	metrics.InitStatsdClient(ctx.Config.App.StatsdAddress, ctx.Config.App.StatsdNamespace, ctx.Logger)
+	metrics.InitStatsdClient(ctx.Config.App.StatsdAddress, ctx.Config.App.StatsdNamespace, ctx.Config.App.StatsdTags, ctx.Logger)
 
 	// Socket perms are octal!
 	socketPerms := 0777

@@ -21,18 +21,18 @@ var (
 	statsdClient *statsd.Client
 )
 
-func InitStatsdClient(address, namespace string, log *log.Logger) {
+func InitStatsdClient(address, namespace string, tags []string, log *log.Logger) {
 	if address == "" {
 		log.Println("StatsD address not provided, skipping initialization")
 		return
 	}
 	var err error
-	statsdClient, err = statsd.New(address, statsd.WithNamespace(namespace))
+	statsdClient, err = statsd.New(address, statsd.WithNamespace(namespace), statsd.WithTags(tags))
 	if err != nil {
 		log.Println("Failed to initialize StatsD client:", err)
 		return
 	}
-	log.Println("StatsD client initialized successfully")
+	log.Println("StatsD client initialized successfully with tags:", tags)
 }
 
 func CloseStatsdClient(log *log.Logger) {
