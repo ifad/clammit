@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"time"
 )
 
 /*
@@ -111,10 +112,11 @@ type Result struct {
 	Status      string
 	Virus       bool
 	Description string
+	Duration    time.Duration
 }
 
 func (r *Result) String() string {
-	ret := fmt.Sprintf("Status: %s; Virus: %v", r.Status, r.Virus)
+	ret := fmt.Sprintf("Status: %s; Virus: %v; Scan Duration: %dms", r.Status, r.Virus, r.Duration.Milliseconds())
 
 	if r.Virus {
 		ret += fmt.Sprintf("; Description: %s", r.Description)

@@ -77,7 +77,7 @@ could set a custom error page in Nginx.
 ### Usage as a service
 
 When used as a service, clammit can be anywhere in your architecture, and it will
-return a 200 OK if the request has no virus, or a configurbale status code if a
+return a 200 OK if the request has no virus, or a configurable status code if a
 virus is detected.
 
 To scan a file, send it via HTTP - using any method you prefer - to the
@@ -132,6 +132,8 @@ log-file        = /var/log/clammit.log
 debug           = true
 test-pages      = true
 max-file-size   = 25MB
+statsd-address  = localhost:8125
+statsd-namespace = clammit
 ```
 
 Setting                  | Description
@@ -142,10 +144,12 @@ clamd-url                | The URL of the clamd server
 virus-status-code        | (Optional) The HTTP status code to return when a virus is found. Default 418
 application-url          | (Optional) Forward all requests to this application
 content-memory-threshold | (Optional) Maximum payload size to keep in RAM. Larger files are spooled to disk
-log-file                 | (Optional) The clammit log file, if ommitted will log to stdout
+log-file                 | (Optional) The clammit log file, if omitted will log to stdout
 test-pages               | (Optional) If true, clammit will also offer up a page to perform test uploads
 debug                    | (Optional) If true, more things will be logged
 max-file-size            | (Optional) The maximum file size to scan. Files larger than this will not be scanned. Default 25MB
+statsd-address           | (Optional) The address of the StatsD server for metrics collection
+statsd-namespace         | (Optional) The namespace for StatsD metrics. Default is "clammit"
 
 The listen address can be a TCP port or Unix socket, e.g.:
 
@@ -159,6 +163,17 @@ decide where to send requests to. If you only have one backend server, you can
 set it in the `application-url` configuration option, and omit the header.
 
 The `max-file-size` setting allows you to specify a maximum file size for scanning. If an uploaded file size exceeds this limit, the file will not be scanned. This can be specified as a string using units like "KB", "MB", or "GB". For example, "10MB" would set the maximum file size to 10 megabytes. If this setting is not provided, the default value is 25MB.
+
+## Metrics
+
+Clammit can send metrics to a StatsD server. To enable this, configure the `statsd-address` and `statsd-namespace` settings in the configuration file.
+
+Metrics collected include:
+
+* `scan.response_time` - Histogram of the time taken to process each scan request
+* `scan.failed` - Count of the number of failed scan requests
+* `scan.processed` - Count of the number of processed scan requests
+* `scan.viruses_found` - Count of the number of viruses found
 
 ## Architecture
 
@@ -176,14 +191,14 @@ incoming requests (main.go):
 
 ## Building
 
-Clammit is requires the Go compiler, version 1.15 or above. It also requires `make`
+Clammit requires the Go compiler, version 1.15 or above. It also requires `make`
 to ease compilation. The makefile is pretty simple, though, so you can perform its
 steps manually if you want.
 
 You will need external access to github and code.google.com to load the
 third-party packages that Clammit depends on: [go-clamd][] and [gcfg][].
 
-Once you have this, simple run:
+Once you have this, simply run:
 
 ```sh
 make
@@ -204,7 +219,7 @@ make test         | Runs the application unit tests
 
 1. Copy the compiled binary (bin/clammit), either into your project repository, or to an installation area.
 2. Edit the configuration file as appropriate.
-3. Configure your auto-start mechanism, be it God or init.d. An example systemd unig is provided.
+3. Configure your auto-start mechanism, be it God or init.d. An example systemd unit is provided.
 4. Configure the upstream webserver to forward appropriate POST requests to clammit.
 
 ## API

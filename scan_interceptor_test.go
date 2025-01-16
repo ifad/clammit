@@ -171,7 +171,7 @@ func setup() {
 func newHTTPRequest(method string, contentType string, body io.Reader) *http.Request {
 	req, _ := http.NewRequest(method, "http://clammit/scan", body)
 	req.Header = map[string][]string{
-		"X-Forwarded-For": []string{"kermit"},
+		"X-Forwarded-For": {"kermit"},
 	}
 	if contentType != "" {
 		req.Header["Content-Type"] = []string{contentType}

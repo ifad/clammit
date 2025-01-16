@@ -8,6 +8,7 @@ package main
 import (
 	"bytes"
 	"clammit/forwarder"
+	"clammit/metrics"
 	"clammit/scanner"
 	"encoding/json"
 	"flag"
@@ -22,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"gopkg.in/gcfg.v1"
 )
@@ -79,6 +81,10 @@ type ApplicationConfig struct {
 	NumThreads int `gcfg:"num-threads"`
 	// Maximum file size to scan
 	MaxFileSize string `gcfg:"max-file-size"`
+	// StatsD address
+	StatsdAddress string `gcfg:"statsd-address"`
+	// StatsD namespace
+	StatsdNamespace string `gcfg:"statsd-namespace"`
 }
 
 // Default configuration
@@ -94,6 +100,8 @@ var DefaultApplicationConfig = ApplicationConfig{
 	Debug:                  false,
 	NumThreads:             runtime.NumCPU(),
 	MaxFileSize:            "25MB",
+	StatsdAddress:          "",
+	StatsdNamespace:        "clammit",
 }
 
 // Application context
@@ -116,6 +124,12 @@ type Info struct {
 	ScannerVersion      string `json:"scan_server_version"`
 	TestScanVirusResult string `json:"test_scan_virus"`
 	TestScanCleanResult string `json:"test_scan_clean"`
+}
+
+// Response recorder to capture the status code
+type responseRecorder struct {
+	http.ResponseWriter
+	statusCode int
 }
 
 // Global variables and config
@@ -143,20 +157,29 @@ func main() {
 		log.Fatalf("Configuration read failure: %s", err.Error())
 	}
 
+	// Initialize logging
+	startLogging()
+
+	// Ensure StatsD namespace ends with a dot
+	if !strings.HasSuffix(ctx.Config.App.StatsdNamespace, ".") {
+		ctx.Config.App.StatsdNamespace += "."
+	}
+
+	// Initialize the StatsD client with user-configured values
+	metrics.InitStatsdClient(ctx.Config.App.StatsdAddress, ctx.Config.App.StatsdNamespace, ctx.Logger)
+
 	// Socket perms are octal!
 	socketPerms := 0777
 	if ctx.Config.App.SocketPerms != "" {
 		if sp, err := strconv.ParseInt(ctx.Config.App.SocketPerms, 8, 0); err == nil {
 			socketPerms = int(sp)
 		} else {
-			log.Fatalf("SocketPerms invalid (expected 4-digit octal: %s", err.Error())
+			ctx.Logger.Fatalf("SocketPerms invalid (expected 4-digit octal: %s", err.Error())
 		}
 	}
 
 	// Allow multi-proc
 	runtime.GOMAXPROCS(ctx.Config.App.NumThreads)
-
-	startLogging()
 
 	/*
 	 * Construct objects, validate the URLs
@@ -221,7 +244,7 @@ func startLogging() {
  * HTTP listener.
  */
 func beGraceful() {
-	sigchan := make(chan os.Signal)
+	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		activity := 0
@@ -235,6 +258,8 @@ func beGraceful() {
 					i := <-ctx.ActivityChan
 					activity += i
 				}
+				// Close the StatsD client
+				metrics.CloseStatsdClient(ctx.Logger)
 				// This will cause main() to continue from http.Serve()
 				// it will also clean up the unix socket (if relevant)
 				ctx.Listener.Close()
@@ -310,9 +335,19 @@ func scanHandler(w http.ResponseWriter, req *http.Request) {
 	ctx.ActivityChan <- 1
 	defer func() { ctx.ActivityChan <- -1 }()
 
-	if !ctx.ScanInterceptor.Handle(w, req, req.Body) {
-		w.Write([]byte("No virus found"))
+	start := time.Now()
+	failed := false
+	virusesFound := 0
+
+	if ctx.ScanInterceptor.Handle(w, req, req.Body) {
+		virusesFound = ctx.ScanInterceptor.VirusesFound
+		if virusesFound == 0 {
+			failed = true
+		}
 	}
+
+	duration := time.Since(start)
+	metrics.UpdateMetrics(duration, failed, ctx.ScanInterceptor.FileCount, virusesFound, ctx.Logger)
 }
 
 /*
@@ -327,9 +362,31 @@ func scanForwardHandler(w http.ResponseWriter, req *http.Request) {
 	ctx.ActivityChan <- 1
 	defer func() { ctx.ActivityChan <- -1 }()
 
+	start := time.Now()
+	failed := false
+	virusesFound := 0
+
 	fw := forwarder.NewForwarder(ctx.ApplicationURL, ctx.Config.App.ContentMemoryThreshold, ctx.ScanInterceptor)
 	fw.SetLogger(ctx.Logger, ctx.Config.App.Debug)
-	fw.HandleRequest(w, req)
+
+	// Capture the response writer to detect if an error response is written
+	rec := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+	fw.HandleRequest(rec, req)
+
+	if ctx.ScanInterceptor.VirusesFound > 0 {
+		virusesFound = ctx.ScanInterceptor.VirusesFound
+	} else if rec.statusCode != ctx.Config.App.VirusStatusCode && rec.statusCode >= 400 {
+		failed = true
+	}
+
+	duration := time.Since(start)
+	metrics.UpdateMetrics(duration, failed, ctx.ScanInterceptor.FileCount, virusesFound, ctx.Logger)
+}
+
+// responseRecorder is a wrapper to capture the status code written to the ResponseWriter
+func (rec *responseRecorder) WriteHeader(code int) {
+	rec.statusCode = code
+	rec.ResponseWriter.WriteHeader(code)
 }
 
 /*
@@ -359,7 +416,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 			info.ScannerVersion = response
 		}
 		/*
-		 * Validate the Clamd response for a viral string
+		* Validate the Clamd response for a viral string
 		 */
 		reader := bytes.NewReader(EICAR)
 		if result, err := ctx.Scanner.Scan(reader); err != nil {
@@ -368,7 +425,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 			info.TestScanVirusResult = result.String()
 		}
 		/*
-		 * Validate the Clamd response for a non-viral string
+		* Validate the Clamd response for a non-viral string
 		 */
 		reader = bytes.NewReader([]byte("foo bar mcgrew"))
 		if result, err := ctx.Scanner.Scan(reader); err != nil {
@@ -391,8 +448,8 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
  */
 func readyzHandler(w http.ResponseWriter, req *http.Request) {
 	if ctx.ShuttingDown {
-		w.WriteHeader(503)
+		w.WriteHeader(http.StatusServiceUnavailable)
 	} else {
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}
 }

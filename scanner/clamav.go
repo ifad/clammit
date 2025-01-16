@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"io"
+	"time"
 
 	clamd "github.com/dutchcoders/go-clamd"
 )
@@ -37,6 +38,8 @@ func (c *Clamav) Scan(reader io.Reader) (*Result, error) {
 		c.logger.Println("Sending to clamav")
 	}
 
+	startTime := time.Now()
+
 	abortChannel := make(chan bool)
 	defer close(abortChannel) // necessary to not leak a goroutine. See https://github.com/dutchcoders/go-clamd/issues/9
 	ch, err := c.clam.ScanStream(reader, abortChannel)
@@ -58,10 +61,13 @@ func (c *Clamav) Scan(reader io.Reader) (*Result, error) {
 		status = RES_ERROR
 	}
 
+	duration := time.Since(startTime)
+
 	result := &Result{
 		Status:      status,
 		Virus:       status == RES_FOUND,
 		Description: r.Description,
+		Duration:    duration,
 	}
 
 	if c.debug {
