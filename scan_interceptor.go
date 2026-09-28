@@ -47,15 +47,15 @@ func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 	//
 	contentType, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	if err != nil {
-		ctx.Logger.Println("Unable to parse media type:", err)
-		return false
+		ctx.Logger.Println("Unable to parse media type, scanning the whole body:", err)
 	}
 
-	if contentType == "multipart/form-data" {
+	if err == nil && contentType == "multipart/form-data" {
 		boundary := params["boundary"]
 		if boundary == "" {
 			ctx.Logger.Println("Multipart boundary is not defined")
-			return false
+			http.Error(w, "Bad Request", 400)
+			return true
 		}
 
 		reader := multipart.NewReader(body, boundary)

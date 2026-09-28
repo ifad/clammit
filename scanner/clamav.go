@@ -1,6 +1,8 @@
 package scanner
 
 import (
+	"errors"
+	"fmt"
 	"io"
 
 	clamd "github.com/dutchcoders/go-clamd"
@@ -46,16 +48,21 @@ func (c *Clamav) Scan(reader io.Reader) (*Result, error) {
 	var status string
 
 	r := (<-ch)
+	if r == nil {
+		return nil, errors.New("clamd closed the connection without a scan result")
+	}
 
 	switch r.Status {
 	case clamd.RES_OK:
 		status = RES_CLEAN
 	case clamd.RES_FOUND:
 		status = RES_FOUND
-	case clamd.RES_ERROR:
-	case clamd.RES_PARSE_ERROR:
 	default:
-		status = RES_ERROR
+		go func() {
+			for range ch {
+			}
+		}()
+		return nil, fmt.Errorf("clamd scan failed: %s", r.Raw)
 	}
 
 	result := &Result{
