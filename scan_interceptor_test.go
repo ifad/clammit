@@ -257,3 +257,16 @@ func TestMultipartRequest_UnparseableParamsAreRefused(t *testing.T) {
 		}
 	}
 }
+
+func TestRequest_DuplicateContentTypeIsRefused(t *testing.T) {
+	setup()
+	req := newHTTPRequest("POST", "application/octet-stream", bytes.NewReader([]byte("--XX\r\n\r\n<virus/>\r\n--XX--\r\n")))
+	req.Header.Add("Content-Type", "multipart/form-data; boundary=XX")
+	rr := httptest.NewRecorder()
+	if handled := scanInterceptor.Handle(rr, req, req.Body); !handled {
+		t.Fatal("a request with more than one Content-Type must not be forwarded")
+	}
+	if rr.Code != 400 {
+		t.Errorf("handler returned wrong status code: got %v want %v", rr.Code, 400)
+	}
+}
