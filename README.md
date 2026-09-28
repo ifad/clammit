@@ -14,7 +14,8 @@ each part or the whole body to ClamAV. If ClamAV detects a virus, clammit will t
 return a response with code 418 to the caller. If the scan cannot be completed (clamd
 unreachable, an `ERROR` reply, or a reply clammit cannot parse), clammit returns 500
 and does not forward the request. A body without a parseable Content-Type is scanned
-as a whole; a multipart body without a usable boundary is refused with 400. Otherwise,
+as a whole; a multipart body without a usable boundary, or a request
+with more than one Content-Type header, is refused with 400. Otherwise,
 it will continue processing.
 
 Clammit can be be used in two ways: as an intercepting proxy or as a virus check service.
