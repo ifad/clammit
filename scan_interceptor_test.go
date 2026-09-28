@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"clammit/scanner"
+	"errors"
 	"io"
 	"log"
 	"mime/multipart"
@@ -15,13 +16,17 @@ import (
 const virusCode = 418
 
 var mockVirusFound = false
+var mockScanErr error
+var mockScanned []string
 
 type MockScanner struct {
 	scanner.Engine
 }
 
 func (s MockScanner) HasVirus(reader io.Reader) (bool, error) {
-	return mockVirusFound, nil
+	data, _ := io.ReadAll(reader)
+	mockScanned = append(mockScanned, string(data))
+	return mockVirusFound, mockScanErr
 }
 
 var scanInterceptor = ScanInterceptor{
@@ -166,6 +171,9 @@ func setup() {
 	}
 	ctx.Logger = log.New(os.Stdout, "", log.LstdFlags)
 	ctx.Config.App.Debug = true
+	mockVirusFound = false
+	mockScanErr = nil
+	mockScanned = nil
 }
 
 func newHTTPRequest(method string, contentType string, body io.Reader) *http.Request {
@@ -177,4 +185,88 @@ func newHTTPRequest(method string, contentType string, body io.Reader) *http.Req
 		req.Header["Content-Type"] = []string{contentType}
 	}
 	return req
+}
+
+func TestRequest_ScanErrorIsRefused(t *testing.T) {
+	setup()
+	mockScanErr = errors.New("clamd unavailable")
+	req := newHTTPRequest("POST", "application/octet-stream", bytes.NewReader([]byte(`<data/>`)))
+	rr := httptest.NewRecorder()
+	if handled := scanInterceptor.Handle(rr, req, req.Body); !handled {
+		t.Fatal("a scan error must stop the request from being forwarded")
+	}
+	if rr.Code != 500 {
+		t.Errorf("handler returned wrong status code: got %v want %v", rr.Code, 500)
+	}
+}
+
+func TestRequest_MissingContentTypeIsScanned(t *testing.T) {
+	setup()
+	mockVirusFound = true
+	req := newHTTPRequest("POST", "", bytes.NewReader([]byte(`<virus/>`)))
+	rr := httptest.NewRecorder()
+	if handled := scanInterceptor.Handle(rr, req, req.Body); !handled {
+		t.Fatal("a body without Content-Type must be scanned, not forwarded unscanned")
+	}
+	if rr.Code != virusCode {
+		t.Errorf("handler returned wrong status code: got %v want %v", rr.Code, virusCode)
+	}
+	if len(mockScanned) != 1 || mockScanned[0] != `<virus/>` {
+		t.Errorf("expected the raw body to be scanned once, got %q", mockScanned)
+	}
+}
+
+func TestRequest_MalformedContentTypeIsScanned(t *testing.T) {
+	setup()
+	mockVirusFound = true
+	req := newHTTPRequest("POST", "application/octet-stream; charset", bytes.NewReader([]byte(`<virus/>`)))
+	rr := httptest.NewRecorder()
+	if handled := scanInterceptor.Handle(rr, req, req.Body); !handled {
+		t.Fatal("a body with an unparseable Content-Type must be scanned, not forwarded unscanned")
+	}
+	if rr.Code != virusCode {
+		t.Errorf("handler returned wrong status code: got %v want %v", rr.Code, virusCode)
+	}
+}
+
+func TestMultipartRequest_MissingBoundaryIsRefused(t *testing.T) {
+	setup()
+	req := newHTTPRequest("POST", "multipart/form-data", bytes.NewReader([]byte(`<virus/>`)))
+	rr := httptest.NewRecorder()
+	if handled := scanInterceptor.Handle(rr, req, req.Body); !handled {
+		t.Fatal("a multipart body without a boundary must not be forwarded unscanned")
+	}
+	if rr.Code != 400 {
+		t.Errorf("handler returned wrong status code: got %v want %v", rr.Code, 400)
+	}
+}
+
+func TestMultipartRequest_UnparseableParamsAreRefused(t *testing.T) {
+	for _, contentType := range []string{
+		"multipart/form-data; boundary=XX; foo",
+		"multipart/form-data;boundary=XX;;",
+	} {
+		setup()
+		req := newHTTPRequest("POST", contentType, bytes.NewReader([]byte("--XX\r\n\r\n<virus/>\r\n--XX--\r\n")))
+		rr := httptest.NewRecorder()
+		if handled := scanInterceptor.Handle(rr, req, req.Body); !handled {
+			t.Fatalf("%q: a multipart body that cannot be split into parts must not be forwarded", contentType)
+		}
+		if rr.Code != 400 {
+			t.Errorf("%q: handler returned wrong status code: got %v want %v", contentType, rr.Code, 400)
+		}
+	}
+}
+
+func TestRequest_DuplicateContentTypeIsRefused(t *testing.T) {
+	setup()
+	req := newHTTPRequest("POST", "application/octet-stream", bytes.NewReader([]byte("--XX\r\n\r\n<virus/>\r\n--XX--\r\n")))
+	req.Header.Add("Content-Type", "multipart/form-data; boundary=XX")
+	rr := httptest.NewRecorder()
+	if handled := scanInterceptor.Handle(rr, req, req.Body); !handled {
+		t.Fatal("a request with more than one Content-Type must not be forwarded")
+	}
+	if rr.Code != 400 {
+		t.Errorf("handler returned wrong status code: got %v want %v", rr.Code, 400)
+	}
 }

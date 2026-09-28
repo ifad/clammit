@@ -11,7 +11,12 @@ bodies, checking them against clamd and returning a binary clean/virus status.
 Clammit parses and processes inbound HTTP requests. When it handles a request whose
 Content-Length is non-zero, it will attempt to decode multipart file uploads and pass
 each part or the whole body to ClamAV. If ClamAV detects a virus, clammit will then
-return a response with code 418 to the caller. Otherwise, it will continue processing.
+return a response with code 418 to the caller. If the scan cannot be completed (clamd
+unreachable, an `ERROR` reply, or a reply clammit cannot parse), clammit returns 500
+and does not forward the request. A body without a parseable Content-Type is scanned
+as a whole; a multipart body without a usable boundary, or a request
+with more than one Content-Type header, is refused with 400. Otherwise,
+it will continue processing.
 
 Clammit can be be used in two ways: as an intercepting proxy or as a virus check service.
 
