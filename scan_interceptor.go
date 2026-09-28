@@ -46,6 +46,11 @@ func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 	//
 	// Find any attachments
 	//
+	if len(req.Header.Values("Content-Type")) > 1 {
+		ctx.Logger.Println("Refusing request with more than one Content-Type header")
+		http.Error(w, "Bad Request", 400)
+		return true
+	}
 	rawContentType := req.Header.Get("Content-Type")
 	contentType, params, err := mime.ParseMediaType(rawContentType)
 	if err != nil {
