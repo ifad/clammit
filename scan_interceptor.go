@@ -13,6 +13,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"strings"
 )
 
 // The implementation of the Scan interceptor
@@ -45,8 +46,14 @@ func (c *ScanInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 	//
 	// Find any attachments
 	//
-	contentType, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+	rawContentType := req.Header.Get("Content-Type")
+	contentType, params, err := mime.ParseMediaType(rawContentType)
 	if err != nil {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(rawContentType)), "multipart/") {
+			ctx.Logger.Println("Unable to parse multipart media type:", err)
+			http.Error(w, "Bad Request", 400)
+			return true
+		}
 		ctx.Logger.Println("Unable to parse media type, scanning the whole body:", err)
 	}
 
