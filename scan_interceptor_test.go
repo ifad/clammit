@@ -219,7 +219,7 @@ func TestRequest_MissingContentTypeIsScanned(t *testing.T) {
 func TestRequest_MalformedContentTypeIsScanned(t *testing.T) {
 	setup()
 	mockVirusFound = true
-	req := newHTTPRequest("POST", "multipart/form-data; boundary", bytes.NewReader([]byte(`<virus/>`)))
+	req := newHTTPRequest("POST", "application/octet-stream; charset", bytes.NewReader([]byte(`<virus/>`)))
 	rr := httptest.NewRecorder()
 	if handled := scanInterceptor.Handle(rr, req, req.Body); !handled {
 		t.Fatal("a body with an unparseable Content-Type must be scanned, not forwarded unscanned")
@@ -238,5 +238,22 @@ func TestMultipartRequest_MissingBoundaryIsRefused(t *testing.T) {
 	}
 	if rr.Code != 400 {
 		t.Errorf("handler returned wrong status code: got %v want %v", rr.Code, 400)
+	}
+}
+
+func TestMultipartRequest_UnparseableParamsAreRefused(t *testing.T) {
+	for _, contentType := range []string{
+		"multipart/form-data; boundary=XX; foo",
+		"multipart/form-data;boundary=XX;;",
+	} {
+		setup()
+		req := newHTTPRequest("POST", contentType, bytes.NewReader([]byte("--XX\r\n\r\n<virus/>\r\n--XX--\r\n")))
+		rr := httptest.NewRecorder()
+		if handled := scanInterceptor.Handle(rr, req, req.Body); !handled {
+			t.Fatalf("%q: a multipart body that cannot be split into parts must not be forwarded", contentType)
+		}
+		if rr.Code != 400 {
+			t.Errorf("%q: handler returned wrong status code: got %v want %v", contentType, rr.Code, 400)
+		}
 	}
 }
